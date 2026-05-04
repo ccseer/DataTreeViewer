@@ -1,7 +1,9 @@
 #include "data_tree_viewer.h"
 
 #include <QFileInfo>
+#include <QLabel>
 #include <QPointer>
+#include <QResizeEvent>
 #include <QShowEvent>
 #include <QTreeWidgetItem>
 #include <QVBoxLayout>
@@ -33,6 +35,14 @@ DataTreeViewer::DataTreeViewer(QWidget* parent)
 
     m_status = new StatusBar(this);
     layout->addWidget(m_status);
+
+    m_errorLabel = new QLabel(this);
+    m_errorLabel->setAlignment(Qt::AlignCenter);
+    m_errorLabel->setWordWrap(true);
+    m_errorLabel->setStyleSheet(
+        "QLabel { color: #cc0000; font-size: 14px; "
+        "background: rgba(255,255,255,0.92); padding: 24px; }");
+    m_errorLabel->hide();
 
     connect(m_renderer, &TreeRenderer::nodeActivated,
             this,       &DataTreeViewer::onNodeActivated);
@@ -129,6 +139,8 @@ void DataTreeViewer::showLoadingState()
 void DataTreeViewer::onParseCompleted(
     std::shared_ptr<const ParseResult> result, qint64 elapsedMs)
 {
+    m_errorLabel->hide();
+
     if (!result->ok) {
         showError(result->error, result->err_line);
         return;
@@ -207,7 +219,21 @@ void DataTreeViewer::showError(const std::string& message, int errLine)
 {
     m_renderer->clear();
     m_breadcrumb->clear();
-    m_status->showError(QString::fromStdString(message), errLine);
+
+    QString text = QString::fromStdString(message);
+    if (errLine >= 0)
+        text = QString("Parse error — line %1:\n%2").arg(errLine).arg(text);
+
+    m_errorLabel->setText(text);
+    m_errorLabel->resize(size());
+    m_errorLabel->show();
+    m_errorLabel->raise();
+}
+
+void DataTreeViewer::resizeEvent(QResizeEvent* event)
+{
+    QWidget::resizeEvent(event);
+    m_errorLabel->setGeometry(0, 0, event->size().width(), event->size().height());
 }
 
 void DataTreeViewer::showEvent(QShowEvent* event)

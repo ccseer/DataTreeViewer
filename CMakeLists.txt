@@ -28,13 +28,14 @@ FetchContent_Declare(nlohmann_json
 )
 FetchContent_MakeAvailable(nlohmann_json)
 
-# toml++ (header-only)  
+# toml++ (header-only; noex API to avoid exceptions)
 message(STATUS "Fetching third-party dependencies... toml")
 FetchContent_Declare(tomlplusplus
     GIT_REPOSITORY https://github.com/marzer/tomlplusplus.git
     GIT_TAG        v3.4.0
     GIT_SHALLOW    TRUE
 )
+set(TOML_EXCEPTIONS 0 CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(tomlplusplus)
 
 # SimpleIni (single header)
@@ -46,7 +47,14 @@ FetchContent_Declare(simpleini
 )
 FetchContent_MakeAvailable(simpleini)
 
-# rapidyaml — Phase 7, will use FetchContent
+# rapidyaml — needs exceptions for parse error handling
+set(RYML_DEFAULT_CALLBACK_USES_EXCEPTIONS ON CACHE BOOL "" FORCE)
+FetchContent_Declare(rapidyaml
+    GIT_REPOSITORY https://github.com/biojppm/rapidyaml.git
+    GIT_TAG        v0.7.2
+    GIT_SUBMODULES ext/c4core
+)
+FetchContent_MakeAvailable(rapidyaml)
 
 # ---- Sources ----
 set(CORE_SOURCES
@@ -63,6 +71,8 @@ set(PARSER_SOURCES
     src/parsers/toml_parser.cpp
     src/parsers/ini_parser.h
     src/parsers/ini_parser.cpp
+    src/parsers/yaml_parser.h
+    src/parsers/yaml_parser.cpp
 )
 
 set(WORKER_SOURCES
@@ -101,6 +111,7 @@ target_include_directories(datatreeviewer PRIVATE
 target_link_libraries(datatreeviewer PRIVATE
     nlohmann_json::nlohmann_json
     tomlplusplus::tomlplusplus
+    ryml
     Qt6::Core Qt6::Gui Qt6::Widgets Qt6::Svg
 )
 
@@ -128,6 +139,7 @@ if(BUILD_TESTS)
         target_link_libraries(${NAME} PRIVATE
             nlohmann_json::nlohmann_json
             tomlplusplus::tomlplusplus
+            ryml
             Qt6::Test
         )
         target_sources(${NAME} PRIVATE
@@ -142,4 +154,5 @@ if(BUILD_TESTS)
     add_parser_test(test_jsonc_parser tests/test_jsonc_parser.cpp)
     add_parser_test(test_toml_parser  tests/test_toml_parser.cpp)
     add_parser_test(test_ini_parser   tests/test_ini_parser.cpp)
+    add_parser_test(test_yaml_parser  tests/test_yaml_parser.cpp)
 endif()

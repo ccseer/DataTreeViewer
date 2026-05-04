@@ -45,7 +45,7 @@ void StatusBar::showStats(const QString& formatLabel,
 {
     m_progress->hide();
 
-    m_formatLabel->setText(formatLabel);
+    m_formatLabel->setText(QString("[%1]").arg(formatLabel));
     m_formatLabel->show();
 
     auto fileSizeStr = [](qint64 bytes) -> QString {

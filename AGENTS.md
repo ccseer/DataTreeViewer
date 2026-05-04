@@ -11,7 +11,7 @@ C++17 · Qt 6.8 · MSVC · CMake 3.16+
 ## Build & Test
 
 ```powershell
-cmake -B build -DCMAKE_PREFIX_PATH=C:/Qt/6.8.0/msvc2022_64
+cmake -B build -DCMAKE_PREFIX_PATH=C:/Users/corey/Dev/Qt/6.8.3/msvc2022_64
 cmake --build build --config Release
 cmake --build build --config Debug --target datatreeviewer_demo
 ctest --test-dir build --build-config Debug
@@ -64,7 +64,7 @@ DataTreeViewer/
     ├── parsers/                 ← zero Qt
     │   ├── jsonc_parser.h/.cpp  ← nlohmann/json
     │   ├── yaml_parser.h/.cpp   ← rapidyaml
-    │   ├── ryml_impl.cpp        ← single-header define-once TU
+    │   ├── ryml_impl.cpp        ← FetchContent, no single-header TU needed
     │   ├── ini_parser.h/.cpp    ← SimpleIni
     │   └── toml_parser.h/.cpp   ← toml++
     ├── workers/
@@ -74,11 +74,7 @@ DataTreeViewer/
     │   ├── breadcrumb_bar.h/.cpp
     │   ├── search_bar.h/.cpp
     │   └── data_tree_viewer.h/.cpp ← top-level widget
-    ├── third_party/
-    │   ├── nlohmann/json.hpp
-    │   ├── tomlplusplus/toml.hpp
-    │   ├── SimpleIni/SimpleIni.h
-    │   └── ryml/ryml_all.hpp
+    ├── third_party/             ← managed by FetchContent (no manual copies)
     └── demo_host.cpp
 tests/
     ├── CMakeLists.txt
@@ -156,7 +152,7 @@ Four exported C functions via `extern "C" __declspec(dllexport)`:
 4. TreeRenderer with style, expand, array keys, soft limit
 5. TomlParser
 6. IniParser
-7. YamlParser + ryml_impl.cpp
+7. YamlParser (FetchContent rapidyaml, no ryml_impl.cpp needed)
 8. BreadcrumbBar + SearchBar (ported from JsonTreeViewer)
 9. Status bar polish
 10. Encoding (UTF-8 BOM strip)
@@ -171,4 +167,4 @@ Four exported C functions via `extern "C" __declspec(dllexport)`:
 | nlohmann/json | 3.11 | strips comments (v1 limitation) |
 | toml++ | 3.4 | ISO 8601 datetimes → String |
 | SimpleIni | 4.22 | case-sensitive keys, duplicates not merged |
-| rapidyaml | 0.7 | requires `ryml_impl.cpp` TU with `RYML_SINGLE_HDR_DEFINE_NOW` |
+| rapidyaml | 0.7 | FetchContent with c4core submodule, exceptions required |

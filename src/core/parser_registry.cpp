@@ -7,7 +7,7 @@
 #include "parsers/jsonc_parser.h"
 #include "parsers/toml_parser.h"
 #include "parsers/ini_parser.h"
-// #include "parsers/yaml_parser.h"  // Phase 7
+#include "parsers/yaml_parser.h"
 
 ParserRegistry& ParserRegistry::instance()
 {
@@ -56,5 +56,5 @@ void ParserRegistry::registerBuiltinParsers()
     JsoncParser::registerSelf();
     TomlParser::registerSelf();
     IniParser::registerSelf();
-    // YamlParser::registerSelf();  // Phase 7
+    YamlParser::registerSelf();
 }

@@ -7,6 +7,7 @@
 struct ConfigNode;
 struct ParseResult;
 class BreadcrumbBar;
+class QLabel;
 class SearchBar;
 class StatusBar;
 class TreeRenderer;
@@ -25,6 +26,7 @@ signals:
 
 protected:
     void showEvent(QShowEvent* event) override;
+    void resizeEvent(QResizeEvent* event) override;
 
 private:
     void cancelPending();
@@ -40,6 +42,7 @@ private:
     TreeRenderer*  m_renderer   = nullptr;
     SearchBar*     m_search     = nullptr;
     StatusBar*     m_status     = nullptr;
+    QLabel*        m_errorLabel = nullptr;
 
     int          m_generation = 0;
     std::shared_ptr<const ParseResult> m_lastResult;

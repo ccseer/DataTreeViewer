@@ -1,0 +1,64 @@
+# YAML 1.2 sample for DataTreeViewer testing
+
+# Top-level mapping
+name: DataTreeViewer
+version: 1.0
+active: true
+score: 98.6
+notes: null
+
+# Nested object
+owner:
+  login: octocat
+  id: 1
+  site_admin: false
+
+# Sequence
+tags:
+  - yaml
+  - tree
+  - viewer
+
+# Nested sequences
+matrix:
+  - [1, 2, 3]
+  - [4, 5, 6]
+  - [7, 8, 9]
+
+# Deeply nested structure
+deep:
+  level1:
+    level2:
+      level3:
+        level4: deep value
+
+# Multi-line string (literal)
+description: |
+  This is a multi-line
+  string literal block
+  in YAML.
+
+# Multi-line string (folded)
+summary: >
+  This is a folded
+  string that will
+  be on one line.
+
+# Various scalar types
+types:
+  string_val: hello world
+  int_val: 42
+  neg_val: -17
+  float_val: 3.14159
+  bool_true: true
+  bool_false: false
+  null_val: ~
+  explicit_null: null
+
+# Comments on key and value
+# This is a key comment
+commented_key: commented value  # inline value comment
+
+# Empty collections
+empty_map: {}
+empty_seq: []
