@@ -1,0 +1,53 @@
+# TOML 1.0 sample for DataTreeViewer testing
+
+title = "TOML Example"
+
+[owner]
+name = "Tom Preston-Werner"
+dob = 1979-05-27T07:32:00-08:00
+active = true
+
+[database]
+enabled = true
+ports = [8000, 8001, 8002]
+data = [["delta", "phi"], [3.14]]
+temp_targets = { cpu = 79.5, case = 72.0 }
+
+[servers]
+
+[servers.alpha]
+ip = "10.0.0.1"
+role = "frontend"
+
+[servers.beta]
+ip = "10.0.0.2"
+role = "backend"
+
+[[products]]
+name = "Hammer"
+sku = 738594937
+
+[[products]]
+name = "Nail"
+sku = 284758393
+
+[[products]]
+name = "Screw"
+sku = 384757291
+
+# Standalone section tests
+[empty_section]
+
+[empty_section.nested]
+value = "in nested"
+
+[types]
+string_val = "hello"
+int_val = 42
+neg_val = -17
+float_val = 3.14159
+bool_true = true
+bool_false = false
+date_val = 2024-01-15
+time_val = 14:30:00
+array_val = [1, 2, 3]

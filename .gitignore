@@ -130,3 +130,6 @@ x86/
 # Built Visual Studio Code Extensions
 *.vsix
 ignored/*
+
+### CMake user presets (contains user-specific paths)
+CMakeUserPresets.json

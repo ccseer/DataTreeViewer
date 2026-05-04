@@ -1,0 +1,31 @@
+{
+    // This is a sample JSONC file with comments
+    "name": "DataTreeViewer",
+    "version": 1,
+    "active": true,
+    "score": 98.6,
+    "notes": null,
+    "empty_object": {},
+    "empty_array": [],
+    "owner": {
+        "login": "octocat",
+        "id": 1,
+        "site_admin": false
+    },
+    "tags": ["json", "tree", "viewer"],
+    "deep": {
+        "level1": {
+            "level2": {
+                "level3": {
+                    "level4": {
+                        "level5": "deep value"
+                    }
+                }
+            }
+        }
+    },
+    /* Multi-line
+       comment block */
+    "unicode": "Hello, 世界 🌍",
+    "escaped": "line1\nline2\t\"quoted\""
+}
