@@ -1,0 +1,41 @@
+* text=auto
+
+*.c text eol=crlf
+*.cc text eol=crlf
+*.cmake text eol=crlf
+*.cpp text eol=crlf
+*.cxx text eol=crlf
+*.h text eol=crlf
+*.hpp text eol=crlf
+*.json text eol=crlf
+*.md text eol=crlf
+*.pri text eol=crlf
+*.pro text eol=crlf
+*.ps1 text eol=crlf
+*.qrc text eol=crlf
+*.rc text eol=crlf
+*.txt text eol=crlf
+*.xml text eol=crlf
+*.yml text eol=crlf
+*.yaml text eol=crlf
+
+.clang-format text eol=crlf
+.clang-tidy text eol=crlf
+.cmake-format text eol=crlf
+.editorconfig text eol=crlf
+.gitattributes text eol=crlf
+.gitignore text eol=crlf
+
+*.7z binary
+*.aps binary
+*.dll binary
+*.exe binary
+*.ico binary
+*.jpg binary
+*.jpeg binary
+*.lib binary
+*.otf binary
+*.pdb binary
+*.png binary
+*.ttf binary
+*.zip binary
