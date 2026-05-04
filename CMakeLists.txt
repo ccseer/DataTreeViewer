@@ -16,6 +16,15 @@ endif()
 
 find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Svg)
 
+# ---- SeerSdk (plugin host interface) ----
+include(FetchContent)
+FetchContent_Declare(SeerSdk
+    GIT_REPOSITORY https://github.com/ccseer/Seer-sdk.git
+    GIT_TAG        main
+    GIT_SHALLOW    TRUE
+)
+FetchContent_MakeAvailable(SeerSdk)
+
 # ---- Third-Party via FetchContent ----
 include(FetchContent)
 
@@ -101,6 +110,7 @@ add_library(datatreeviewer SHARED
     ${PARSER_SOURCES}
     ${WORKER_SOURCES}
     ${UI_SOURCES}
+    ${seersdk_SOURCE_DIR}/seer/viewerbase.h
 )
 
 target_include_directories(datatreeviewer PRIVATE
@@ -109,6 +119,7 @@ target_include_directories(datatreeviewer PRIVATE
 )
 
 target_link_libraries(datatreeviewer PRIVATE
+    SeerSdk::SeerSdk
     nlohmann_json::nlohmann_json
     tomlplusplus::tomlplusplus
     ryml
@@ -122,7 +133,13 @@ set_target_properties(datatreeviewer PROPERTIES
 add_executable(datatreeviewer_demo WIN32 src/demo_host.cpp)
 target_include_directories(datatreeviewer_demo PRIVATE src/ ${simpleini_SOURCE_DIR})
 target_link_libraries(datatreeviewer_demo PRIVATE
-    datatreeviewer Qt6::Core Qt6::Gui Qt6::Widgets)
+    datatreeviewer SeerSdk::SeerSdk Qt6::Core Qt6::Gui Qt6::Widgets)
+
+# ---- Seer Integration Test ----
+add_executable(datatreeviewer_test WIN32 src/test.cpp)
+target_include_directories(datatreeviewer_test PRIVATE src/ ${simpleini_SOURCE_DIR})
+target_link_libraries(datatreeviewer_test PRIVATE
+    datatreeviewer SeerSdk::SeerSdk Qt6::Core Qt6::Gui Qt6::Widgets)
 
 # ---- Tests ----
 option(BUILD_TESTS "Build parser unit tests" ON)
