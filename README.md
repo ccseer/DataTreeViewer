@@ -16,29 +16,21 @@ DataTreeViewer lets you preview and navigate JSONC, TOML, INI, and YAML files in
 
 Requirements: Qt 6.8, CMake 3.16+, MSVC (Visual Studio 2022)
 
-```powershell
-cmake -B build -DCMAKE_PREFIX_PATH=C:/Qt/6.8.0/msvc2022_64
-cmake --build build --config Release
-```
+Open the project folder in your IDE (Visual Studio or VS Code with CMake Tools), select `datatreeviewer_test` as the startup item, then build and run.
 
 This produces:
 - `datatreeviewer.dll` — the Seer plugin
-- `datatreeviewer_demo.exe` — standalone demo viewer
 
-To run tests:
-
-```powershell
-cmake --build build --config Debug --target datatreeviewer_demo
-ctest --test-dir build --build-config Debug
-```
+To run parser tests:
 
 ## Use with Seer
 
 **[Seer](https://1218.io)** is the ultimate quick-look file preview tool for Windows — press Space on any file to instantly preview it without opening a full application.
 
 1. Download **[Seer](https://1218.io)**
-2. Copy `datatreeviewer.dll` to your Seer plugins directory
-3. Press Space on any `.jsonc`, `.toml`, `.ini`, or `.yaml` file
+2. In Seer, go to **Settings → Plugins** and install the _DataTreeViewer_ plugin
+3. Replace the installed plugin DLL with your freshly built `datatreeviewer.dll`
+4. Press Space on any `.jsonc`, `.toml`, `.ini`, or `.yaml` file
 
 ## License
 

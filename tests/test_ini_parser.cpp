@@ -9,7 +9,7 @@ class TestIniParser : public QObject {
 private:
     IniParser m_parser;
 
-    std::string readFixture(const char* name)
+    std::string readFixture(const char *name)
     {
         QString path = QString(FIXTURES_DIR) + "/" + name;
         QFile f(path);
@@ -73,8 +73,9 @@ private slots:
 
         // SimpleIni does not expose comments — all comment fields should be empty
         bool allEmpty = true;
-        for (const auto& child : result.root.children) {
-            if (!child.comment.empty()) allEmpty = false;
+        for(const auto &child : result.root.children) {
+            if(!child.comment.empty())
+                allEmpty = false;
         }
         QVERIFY(allEmpty);
     }
@@ -84,9 +85,9 @@ private slots:
         auto result = m_parser.parse(readFixture("sample.ini"));
         QVERIFY(result.ok);
 
-        const ConfigNode* logging = nullptr;
-        for (const auto& child : result.root.children) {
-            if (child.key == "Logging") {
+        const ConfigNode *logging = nullptr;
+        for(const auto &child : result.root.children) {
+            if(child.key == "Logging") {
                 logging = &child;
                 break;
             }
@@ -95,8 +96,8 @@ private slots:
 
         // Count "level" keys — should be 3
         int levelCount = 0;
-        for (const auto& child : logging->children) {
-            if (child.key == "level")
+        for(const auto &child : logging->children) {
+            if(child.key == "level")
                 levelCount++;
         }
         QCOMPARE(levelCount, 3);
@@ -110,13 +111,21 @@ private slots:
         // INI sections are flat — all sections are children of root
         // Verify Display section exists as an Object
         bool foundDisplay = false;
-        for (const auto& child : result.root.children) {
-            if (child.key == "Display") {
+        for(const auto &child : result.root.children) {
+            if(child.key == "Display") {
                 foundDisplay = true;
                 QCOMPARE(child.type, ConfigNode::Type::Object);
             }
         }
         QVERIFY(foundDisplay);
+    }
+
+    void test_brokenFile()
+    {
+        auto result = m_parser.parse(readFixture("broken.ini"));
+        // SimpleIni is very forgiving — even broken INI might parse ok without error
+        // Just verify it does not crash
+        QVERIFY(result.ok || !result.error.empty());
     }
 };
 

@@ -1,96 +1,120 @@
 #include "parse_worker.h"
 
+#include <QDebug>
 #include <QFile>
 #include <QScopeGuard>
 #include <QThread>
 
 #include "core/iformat_parser.h"
 
-ParseWorker::ParseWorker(QString path,
-                         std::unique_ptr<IFormatParser> parser,
-                         QObject* parent)
-    : QObject(parent)
-    , m_path(std::move(path))
-    , m_parser(std::move(parser))
-{
-}
+#define qprintt qDebug() << "[ParseWorker]"
+
+ParseWorker::ParseWorker(QString path, std::unique_ptr<IFormatParser> parser, QObject *parent)
+    : QObject(parent), m_path(std::move(path)), m_parser(std::move(parser))
+{}
 
 void ParseWorker::doParse()
 {
-    auto _cleanup = qScopeGuard([this] { deleteLater(); });
+    qprintt << "start" << m_path;
+    auto _cleanup = qScopeGuard([this] {
+        deleteLater();
+    });
 
     QElapsedTimer timer;
     timer.start();
 
-    auto* thread = QThread::currentThread();
+    auto *thread = QThread::currentThread();
 
-    if (thread->isInterruptionRequested())
+    if(thread->isInterruptionRequested()) {
+        qprintt << "interrupted before start";
         return;
+    }
 
     // 1. Open + size check
     QFile f(m_path);
-    if (!f.open(QIODevice::ReadOnly)) {
+    if(!f.open(QIODevice::ReadOnly)) {
+        qprintt << "open failed:" << f.errorString();
         auto r = std::make_shared<ParseResult>();
-        r->ok    = false;
+        r->ok = false;
         r->error = f.errorString().toStdString();
         emit parseCompleted(r, timer.elapsed());
         return;
     }
-    if (f.size() > kMaxFileBytes) {
+    if(f.size() > kMaxFileBytes) {
+        qprintt << "file too large:" << f.size() << "bytes";
         auto r = std::make_shared<ParseResult>();
-        r->ok    = false;
+        r->ok = false;
         r->error = "File too large (max 64 MB)";
         emit parseCompleted(r, timer.elapsed());
         return;
     }
     qint64 fileBytes = f.size();
     QByteArray raw = f.readAll();
+    qprintt << "read" << fileBytes << "bytes";
 
-    if (thread->isInterruptionRequested())
+    if(thread->isInterruptionRequested()) {
+        qprintt << "interrupted after read";
         return;
+    }
 
     // 2. Strip UTF-8 BOM if present
-    if (raw.startsWith("\xEF\xBB\xBF"))
+    if(raw.startsWith("\xEF\xBB\xBF")) {
         raw.remove(0, 3);
+        qprintt << "BOM stripped";
+    }
 
-    if (thread->isInterruptionRequested())
+    if(thread->isInterruptionRequested()) {
+        qprintt << "interrupted after BOM";
         return;
+    }
 
     // 3. Capture parser metadata before parse
-    std::string fmtName   = m_parser->format_name();
+    std::string fmtName = m_parser->format_name();
     std::string fmtCredit = m_parser->library_credit();
 
-    if (thread->isInterruptionRequested())
+    if(thread->isInterruptionRequested()) {
+        qprintt << "interrupted before parse";
         return;
+    }
 
     // 4. Parse
+    qprintt << "parsing with" << fmtName.c_str();
     auto result = std::make_shared<ParseResult>(
         m_parser->parse(std::string_view(raw.constData(), size_t(raw.size()))));
 
-    if (thread->isInterruptionRequested())
+    if(!result->ok) {
+        qprintt << "parse failed:" << result->error.c_str();
+    }
+
+    if(thread->isInterruptionRequested()) {
+        qprintt << "interrupted after parse";
         return;
+    }
 
     // 5. Fill metadata
-    result->format_name    = std::move(fmtName);
+    result->format_name = std::move(fmtName);
     result->library_credit = std::move(fmtCredit);
-    result->file_bytes     = fileBytes;
+    result->file_bytes = fileBytes;
 
     // 6. Count total nodes (non-recursive DFS)
-    result->total_nodes = [](const ConfigNode& root) -> int {
+    result->total_nodes = [](const ConfigNode &root) -> int {
         int count = 0;
-        std::vector<const ConfigNode*> stack = { &root };
-        while (!stack.empty()) {
-            const auto* n = stack.back();
+        std::vector<const ConfigNode *> stack = {&root};
+        while(!stack.empty()) {
+            const auto *n = stack.back();
             stack.pop_back();
             ++count;
-            for (const auto& c : n->children)
+            for(const auto &c : n->children)
                 stack.push_back(&c);
         }
         return count;
     }(result->root);
 
-    if (thread->isInterruptionRequested())
+    if(thread->isInterruptionRequested()) {
+        qprintt << "interrupted after count";
         return;
+    }
 
+    qprintt << "done" << result->total_nodes << "nodes" << timer.elapsed() << "ms";
     emit parseCompleted(result, timer.elapsed());
 }

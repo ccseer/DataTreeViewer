@@ -1,49 +1,42 @@
 #pragma once
 
-#include <QTreeWidget>
+#include <QTreeView>
 
 struct ConfigNode;
 
-class TreeRenderer : public QTreeWidget {
+class TreeModel;
+class TreeFilterProxyModel;
+
+class TreeRenderer : public QTreeView {
     Q_OBJECT
 public:
-    explicit TreeRenderer(QWidget* parent = nullptr);
+    explicit TreeRenderer(QWidget *parent = nullptr);
 
-    void render(const ConfigNode& root);
-    void setAutoExpandDepth(int depth);
+    void render(const ConfigNode &root);
+    void clear();
+    void setExpandAll(bool on);
+    void setDarkMode(bool on);
 
-    void applyFilter(const QString& text);
+    void applyFilter(const QString &text);
     void selectNextMatch();
     void selectPreviousMatch();
-    int  visibleMatchCount() const;
+    int matchCount() const;
+    int truncatedCount() const
+    {
+        return m_truncatedCount;
+    }
 
-    int truncatedCount() const { return m_truncatedCount; }
+    const ConfigNode *currentNode() const;
 
 signals:
-    void nodeActivated(const ConfigNode* node);
+    void nodeActivated(const ConfigNode *node);
+
+protected:
+    void showEvent(QShowEvent *event) override;
 
 private:
-    struct BuildState {
-        int inserted = 0;
-        int counted  = 0;
-        bool truncated = false;
-    };
-
-    QTreeWidgetItem* buildItem(const ConfigNode& node, int depth,
-                               int arrayIndex, BuildState& state,
-                               QTreeWidgetItem* parent);
-
-    void       applyStyle(QTreeWidgetItem* item, const ConfigNode& node);
-    QString    containerHint(const ConfigNode& node) const;
-    QString    displayKey(const ConfigNode& node, int index) const;
-
-    static int countNodes(const ConfigNode& root);
-
-    static constexpr int kMaxRenderNodes = 50000;
-
-    int m_autoExpandDepth = 2;
-    int m_truncatedCount  = 0;
-
-    QList<QTreeWidgetItem*> m_matchItems;
-    int                     m_currentMatch = -1;
+    TreeModel *m_model = nullptr;
+    TreeFilterProxyModel *m_proxy = nullptr;
+    int m_truncatedCount = 0;
+    bool m_expandAll = false;
 };

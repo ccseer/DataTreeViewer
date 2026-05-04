@@ -4,17 +4,13 @@
 #include <QString>
 
 #include "ui/data_tree_viewer.h"
-#include "core/parser_registry.h"
 
-int main(int argc, char* argv[])
+int main(int argc, char *argv[])
 {
     QApplication app(argc, argv);
 
-    qRegisterMetaType<std::shared_ptr<const ParseResult>>();
-    ParserRegistry::registerBuiltinParsers();
-
     QString path;
-    if (argc > 1) {
+    if(argc > 1) {
         path = QString::fromLocal8Bit(argv[1]);
     } else {
         path = QFileDialog::getOpenFileName(
@@ -22,7 +18,7 @@ int main(int argc, char* argv[])
             "Data Files (*.json *.jsonc *.yaml *.yml *.ini *.cfg *.conf *.toml *.tml);;"
             "All Files (*)");
     }
-    if (path.isEmpty()) {
+    if(path.isEmpty()) {
         return 0;
     }
 
@@ -30,10 +26,20 @@ int main(int argc, char* argv[])
     et.start();
 
     DataTreeViewer viewer;
-    viewer.setWindowTitle(path);
-    viewer.loadFile(path);
+
+    ViewOptionsPrivate d;
+    d.dpr = 1;
+    d.path = path;
+    d.theme = 1;
+    d.viewer_type = viewer.name();
+
+    ViewOptions opts;
+    opts.d_ptr = &d;
+
+    viewer.setWindowTitle(d.path);
+    viewer.load(nullptr, &opts);
     qDebug() << "load" << et.restart() << "ms";
-    viewer.resize(960, 700);
+    viewer.resize(viewer.getContentSize());
     viewer.show();
     qDebug() << "show" << et.restart() << "ms";
 

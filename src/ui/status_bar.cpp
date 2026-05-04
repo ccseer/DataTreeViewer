@@ -4,125 +4,140 @@
 #include <QLabel>
 #include <QProgressBar>
 
-StatusBar::StatusBar(QWidget* parent)
-    : QWidget(parent)
+#include "breadcrumb_bar.h"
+#include "style_assets.h"
+
+#define qprintt qDebug() << "[StatusBar]"
+
+namespace {
+
+QString fileSizeStr(qint64 bytes)
 {
-    auto* layout = new QHBoxLayout(this);
-    layout->setContentsMargins(4, 2, 4, 2);
+    if(bytes < 1024)
+        return QString::number(bytes) + " B";
+    if(bytes < 1024 * 1024)
+        return QString::number(bytes / 1024.0, 'f', 1) + " KB";
+    return QString::number(bytes / (1024.0 * 1024.0), 'f', 2) + " MB";
+}
 
-    m_formatLabel = new QLabel(this);
-    m_formatLabel->setStyleSheet("font-weight: bold;");
-    layout->addWidget(m_formatLabel);
+} // namespace
 
-    m_statsLabel = new QLabel(this);
-    layout->addWidget(m_statsLabel);
+StatusBar::StatusBar(QWidget *parent) : QWidget(parent)
+{
+    setObjectName("btmBar");
 
-    layout->addStretch();
+    auto *layout = new QHBoxLayout(this);
+    layout->setContentsMargins(12, 2, 12, 2);
+    layout->setSpacing(4);
+
+    // Breadcrumb placeholder — setBreadcrumb will add the actual widget
+    m_lineLabel = new QLabel(this);
+    m_lineLabel->setStyleSheet("color: gray;");
+    layout->addWidget(m_lineLabel, 0);
+
+    layout->addStretch(1);
+
+    m_info = new QLabel(this);
+    m_info->setAlignment(Qt::AlignCenter);
+    m_info->setCursor(Qt::ArrowCursor);
+    m_info->setToolTip("DataTreeViewer");
+    layout->addWidget(m_info, 0);
 
     m_progress = new QProgressBar(this);
     m_progress->setRange(0, 0);
-    m_progress->setMaximumWidth(120);
-    m_progress->setMaximumHeight(16);
+    m_progress->setMaximumWidth(80);
+    m_progress->setMaximumHeight(12);
     m_progress->hide();
     layout->addWidget(m_progress);
-
-    m_lineLabel = new QLabel(this);
-    layout->addWidget(m_lineLabel);
-
-    m_creditLabel = new QLabel(this);
-    m_creditLabel->setStyleSheet("color: gray;");
-    layout->addWidget(m_creditLabel);
 
     clear();
 }
 
-void StatusBar::showStats(const QString& formatLabel,
-                          int nodeCount,
-                          qint64 fileBytes,
-                          qint64 elapsedMs,
-                          int truncatedCount,
-                          const QString& libraryCredit)
+void StatusBar::setBreadcrumb(BreadcrumbBar *bar)
 {
-    m_progress->hide();
-
-    m_formatLabel->setText(QString("[%1]").arg(formatLabel));
-    m_formatLabel->show();
-
-    auto fileSizeStr = [](qint64 bytes) -> QString {
-        if (bytes < 1024)
-            return QString::number(bytes) + " B";
-        if (bytes < 1024 * 1024)
-            return QString::number(bytes / 1024.0, 'f', 1) + " KB";
-        return QString::number(bytes / (1024.0 * 1024.0), 'f', 2) + " MB";
-    };
-
-    QString stats = QString("%1 nodes · %2 · %3 ms")
-                        .arg(nodeCount)
-                        .arg(fileSizeStr(fileBytes))
-                        .arg(elapsedMs);
-
-    if (truncatedCount > 0) {
-        stats += QString(" · showing %1 of %2 nodes (truncated)")
-                     .arg(50000)
-                     .arg(50000 + truncatedCount);
-    }
-
-    m_statsLabel->setText(stats);
-    m_statsLabel->show();
-
-    m_creditLabel->setText(libraryCredit);
-    m_creditLabel->show();
-
-    m_lineLabel->clear();
+    m_breadcrumb = bar;
+    m_breadcrumb->setParent(this);
+    auto *lay = qobject_cast<QHBoxLayout *>(layout());
+    if(!lay)
+        return;
+    if(m_lineLabel)
+        m_lineLabel->hide();
+    lay->insertWidget(0, m_breadcrumb, 0);
 }
 
-void StatusBar::showError(const QString& message, int line)
+void StatusBar::setLoadInfo(int nodeCount, qint64 fileBytes, qint64 elapsedMs,
+                            const QString &formatName, const QString &libraryCredit)
 {
+    QStringList lines;
+    lines << QString("Format: %1").arg(formatName);
+    lines << QString("Nodes: %1").arg(nodeCount);
+    lines << QString("File size: %1").arg(fileSizeStr(fileBytes));
+    lines << QString("Load time: %1 ms").arg(elapsedMs);
+    if(!libraryCredit.isEmpty())
+        lines << QString("Library: %1").arg(libraryCredit);
+
+    m_tooltipLines = lines.join("\n");
+    m_hasLoadInfo = true;
+
+    m_info->setToolTip(m_tooltipLines);
+    repaintInfoIcon();
     m_progress->hide();
-    m_formatLabel->hide();
-    m_lineLabel->hide();
-    m_creditLabel->hide();
-
-    QString text = message;
-    if (line >= 0)
-        text = QString("Line %1: %2").arg(line).arg(message);
-
-    m_statsLabel->setText(text);
-    m_statsLabel->setStyleSheet("color: red;");
-    m_statsLabel->show();
-}
-
-void StatusBar::showLoading()
-{
-    m_formatLabel->hide();
-    m_statsLabel->setText("Loading…");
-    m_statsLabel->setStyleSheet("");
-    m_statsLabel->show();
-    m_lineLabel->clear();
-    m_creditLabel->clear();
-    m_progress->show();
 }
 
 void StatusBar::setSourceLine(int line)
 {
-    if (line >= 0)
+    if(line >= 0)
         m_lineLabel->setText(QString("Ln %1").arg(line));
     else
         m_lineLabel->clear();
 }
 
-void StatusBar::showFilterNoHits(const QString& text)
+void StatusBar::showLoading()
 {
-    m_statsLabel->setText(QString("No matches for \"%1\"").arg(text));
-    m_statsLabel->setStyleSheet("color: #808080;");
+    m_hasLoadInfo = false;
+    m_info->setPixmap(QPixmap());
+    m_info->setText("Loading...");
+    m_info->setToolTip("DataTreeViewer");
+    m_progress->show();
+}
+
+void StatusBar::showFilterNoHits(const QString &text)
+{
+    m_info->setPixmap(QPixmap());
+    m_info->setText(QString("No matches for \"%1\"").arg(text));
+    m_info->setToolTip(QString("No matches for \"%1\"").arg(text));
+}
+
+void StatusBar::updateTheme(bool dark, qreal dpr)
+{
+    m_isDarkMode = dark;
+    m_dpr = dpr;
+    if(m_hasLoadInfo)
+        repaintInfoIcon();
 }
 
 void StatusBar::clear()
 {
-    m_formatLabel->clear();
-    m_statsLabel->clear();
-    m_statsLabel->setStyleSheet("");
+    m_hasLoadInfo = false;
+    m_info->setPixmap(QPixmap());
+    m_info->clear();
+    m_info->setToolTip("DataTreeViewer");
     m_lineLabel->clear();
-    m_creditLabel->clear();
     m_progress->hide();
+}
+
+void StatusBar::repaintInfoIcon()
+{
+    if(!m_hasLoadInfo)
+        return;
+
+    using namespace dtv::ui;
+
+    QColor iconColor = m_isDarkMode ? QColor(100, 181, 246) // Material Blue 300
+                                    : QColor("#2196F3");    // Material Blue 500
+
+    int iconSize = qRound(18 * m_dpr);
+    QIcon icon = svgIcon(g_svg_info, iconColor, iconSize);
+    m_info->setPixmap(icon.pixmap(iconSize, iconSize));
+    m_info->setToolTip(m_tooltipLines);
 }

@@ -9,7 +9,7 @@ class TestTomlParser : public QObject {
 private:
     TomlParser m_parser;
 
-    std::string readFixture(const char* name)
+    std::string readFixture(const char *name)
     {
         QString path = QString(FIXTURES_DIR) + "/" + name;
         QFile f(path);
@@ -55,7 +55,7 @@ private slots:
     {
         QTest::addColumn<QString>("input");
         QTest::newRow("bare_string") << "just some text";
-        QTest::newRow("bad_syntax")  << "[section\nkey =";
+        QTest::newRow("bad_syntax") << "[section\nkey =";
     }
 
     void test_parseInvalid()
@@ -70,17 +70,19 @@ private slots:
         auto result = m_parser.parse(readFixture("sample.toml"));
         QVERIFY(result.ok);
 
-        auto findByKey = [](const ConfigNode& parent, const std::string& key) -> const ConfigNode* {
-            for (const auto& c : parent.children)
-                if (c.key == key) return &c;
+        auto findByKey = [](const ConfigNode &parent,
+                            const std::string &key) -> const ConfigNode * {
+            for(const auto &c : parent.children)
+                if(c.key == key)
+                    return &c;
             return nullptr;
         };
 
-        const auto* owner = findByKey(result.root, "owner");
+        const auto *owner = findByKey(result.root, "owner");
         QVERIFY(owner != nullptr);
         QCOMPARE(owner->type, ConfigNode::Type::Object);
 
-        const auto* products = findByKey(result.root, "products");
+        const auto *products = findByKey(result.root, "products");
         QVERIFY(products != nullptr);
         QCOMPARE(products->type, ConfigNode::Type::Array);
     }
@@ -90,31 +92,28 @@ private slots:
         auto result = m_parser.parse(readFixture("sample.toml"));
         QVERIFY(result.ok);
 
-        auto findByKey = [](const ConfigNode& parent, const std::string& key) -> const ConfigNode* {
-            for (const auto& c : parent.children)
-                if (c.key == key) return &c;
+        auto findByKey = [](const ConfigNode &parent,
+                            const std::string &key) -> const ConfigNode * {
+            for(const auto &c : parent.children)
+                if(c.key == key)
+                    return &c;
             return nullptr;
         };
 
-        const auto* types = findByKey(result.root, "types");
+        const auto *types = findByKey(result.root, "types");
         QVERIFY(types != nullptr);
 
         std::unordered_map<std::string, ConfigNode::Type> expected = {
-            {"string_val", ConfigNode::Type::String},
-            {"int_val",    ConfigNode::Type::Integer},
-            {"neg_val",    ConfigNode::Type::Integer},
-            {"float_val",  ConfigNode::Type::Float},
-            {"bool_true",  ConfigNode::Type::Bool},
-            {"bool_false", ConfigNode::Type::Bool},
-            {"date_val",   ConfigNode::Type::String},
-            {"time_val",   ConfigNode::Type::String},
-            {"array_val",  ConfigNode::Type::Array},
+            {"string_val", ConfigNode::Type::String}, {"int_val", ConfigNode::Type::Integer},
+            {"neg_val", ConfigNode::Type::Integer},   {"float_val", ConfigNode::Type::Float},
+            {"bool_true", ConfigNode::Type::Bool},    {"bool_false", ConfigNode::Type::Bool},
+            {"date_val", ConfigNode::Type::String},   {"time_val", ConfigNode::Type::String},
+            {"array_val", ConfigNode::Type::Array},
         };
 
-        for (const auto& child : types->children) {
+        for(const auto &child : types->children) {
             auto it = expected.find(child.key);
-            QVERIFY2(it != expected.end(),
-                     (std::string("Unexpected key: ") + child.key).c_str());
+            QVERIFY2(it != expected.end(), (std::string("Unexpected key: ") + child.key).c_str());
             QCOMPARE(child.type, it->second);
         }
     }
@@ -125,14 +124,21 @@ private slots:
         QVERIFY(result.ok);
 
         // Walk tree, at least some nodes should have source_line > 0
-        std::function<bool(const ConfigNode&)> hasLines =
-            [&](const ConfigNode& node) -> bool {
-                if (node.source_line > 0) return true;
-                for (const auto& c : node.children)
-                    if (hasLines(c)) return true;
-                return false;
-            };
+        std::function<bool(const ConfigNode &)> hasLines = [&](const ConfigNode &node) -> bool {
+            if(node.source_line > 0)
+                return true;
+            for(const auto &c : node.children)
+                if(hasLines(c))
+                    return true;
+            return false;
+        };
         QVERIFY(hasLines(result.root));
+    }
+
+    void test_brokenFile()
+    {
+        auto result = m_parser.parse(readFixture("broken.toml"));
+        QVERIFY(!result.ok);
     }
 };
 

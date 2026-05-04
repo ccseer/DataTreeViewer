@@ -5,10 +5,11 @@
 #include <QLineEdit>
 #include <QTimer>
 
-SearchBar::SearchBar(QWidget* parent)
-    : QWidget(parent)
+#define qprintt qDebug() << "[SearchBar]"
+
+SearchBar::SearchBar(QWidget *parent) : QWidget(parent)
 {
-    auto* layout = new QHBoxLayout(this);
+    auto *layout = new QHBoxLayout(this);
     layout->setContentsMargins(4, 2, 4, 2);
 
     m_edit = new QLineEdit(this);
@@ -20,7 +21,7 @@ SearchBar::SearchBar(QWidget* parent)
     m_timer->setSingleShot(true);
     m_timer->setInterval(150);
 
-    connect(m_edit, &QLineEdit::textChanged, this, [this](const QString& text) {
+    connect(m_edit, &QLineEdit::textChanged, this, [this](const QString &text) {
         m_timer->start();
     });
 
@@ -29,7 +30,8 @@ SearchBar::SearchBar(QWidget* parent)
     });
 
     connect(m_edit, &QLineEdit::returnPressed, this, [this] {
-        if (m_edit->text().isEmpty()) return;
+        if(m_edit->text().isEmpty())
+            return;
         emit nextMatch();
     });
 
@@ -47,13 +49,12 @@ void SearchBar::clear()
     m_edit->clear();
 }
 
-bool SearchBar::eventFilter(QObject* obj, QEvent* event)
+bool SearchBar::eventFilter(QObject *obj, QEvent *event)
 {
-    if (obj == m_edit && event->type() == QEvent::KeyPress) {
-        auto* keyEvent = static_cast<QKeyEvent*>(event);
-        if (keyEvent->key() == Qt::Key_Return &&
-            keyEvent->modifiers() & Qt::ShiftModifier) {
-            if (!m_edit->text().isEmpty())
+    if(obj == m_edit && event->type() == QEvent::KeyPress) {
+        auto *keyEvent = static_cast<QKeyEvent *>(event);
+        if(keyEvent->key() == Qt::Key_Return && keyEvent->modifiers() & Qt::ShiftModifier) {
+            if(!m_edit->text().isEmpty())
                 emit prevMatch();
             return true;
         }

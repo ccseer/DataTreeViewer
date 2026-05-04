@@ -9,7 +9,7 @@ class TestJsoncParser : public QObject {
 private:
     JsoncParser m_parser;
 
-    std::string readFixture(const char* name)
+    std::string readFixture(const char *name)
     {
         QString path = QString(FIXTURES_DIR) + "/" + name;
         QFile f(path);
@@ -53,10 +53,10 @@ private slots:
     void test_parseInvalid_data()
     {
         QTest::addColumn<QString>("input");
-        QTest::newRow("bare_string")  << "hello";
-        QTest::newRow("unclosed")     << "{";
-        QTest::newRow("trailing")     << "{,}";
-        QTest::newRow("bad_number")   << "[1,2,]";
+        QTest::newRow("bare_string") << "hello";
+        QTest::newRow("unclosed") << "{";
+        QTest::newRow("trailing") << "{,}";
+        QTest::newRow("bad_number") << "[1,2,]";
     }
 
     void test_parseInvalid()
@@ -69,7 +69,7 @@ private slots:
 
     void test_nestedContainers()
     {
-        const auto* data = R"({
+        const auto *data = R"({
             "obj": {"a": 1},
             "arr": [1, 2, 3],
             "nested": {"inner": [{"x": true}]}
@@ -79,29 +79,31 @@ private slots:
         QCOMPARE(result.root.type, ConfigNode::Type::Object);
         QCOMPARE(result.root.children.size(), size_t(3));
 
-        auto findByKey = [](const ConfigNode& parent, const std::string& key) -> const ConfigNode* {
-            for (const auto& c : parent.children)
-                if (c.key == key) return &c;
+        auto findByKey = [](const ConfigNode &parent,
+                            const std::string &key) -> const ConfigNode * {
+            for(const auto &c : parent.children)
+                if(c.key == key)
+                    return &c;
             return nullptr;
         };
 
-        const auto* objNode = findByKey(result.root, "obj");
+        const auto *objNode = findByKey(result.root, "obj");
         QVERIFY(objNode != nullptr);
         QCOMPARE(objNode->type, ConfigNode::Type::Object);
 
-        const auto* arrNode = findByKey(result.root, "arr");
+        const auto *arrNode = findByKey(result.root, "arr");
         QVERIFY(arrNode != nullptr);
         QCOMPARE(arrNode->type, ConfigNode::Type::Array);
         QCOMPARE(arrNode->children.size(), size_t(3));
 
-        const auto* nestedNode = findByKey(result.root, "nested");
+        const auto *nestedNode = findByKey(result.root, "nested");
         QVERIFY(nestedNode != nullptr);
         QCOMPARE(nestedNode->type, ConfigNode::Type::Object);
     }
 
     void test_irTypeRoundtrip()
     {
-        const auto* data = R"({
+        const auto *data = R"({
             "str": "hello",
             "int": 42,
             "neg": -7,
@@ -114,20 +116,19 @@ private slots:
         QVERIFY(result.ok);
 
         std::unordered_map<std::string, std::pair<ConfigNode::Type, std::string>> expected = {
-            {"str",       {ConfigNode::Type::String,  "hello"}},
-            {"int",       {ConfigNode::Type::Integer, "42"}},
-            {"neg",       {ConfigNode::Type::Integer, "-7"}},
-            {"float",     {ConfigNode::Type::Float,   "3.14"}},
-            {"true_val",  {ConfigNode::Type::Bool,    "true"}},
-            {"false_val", {ConfigNode::Type::Bool,    "false"}},
-            {"null_val",  {ConfigNode::Type::Null,    "null"}},
+            {"str", {ConfigNode::Type::String, "hello"}},
+            {"int", {ConfigNode::Type::Integer, "42"}},
+            {"neg", {ConfigNode::Type::Integer, "-7"}},
+            {"float", {ConfigNode::Type::Float, "3.14"}},
+            {"true_val", {ConfigNode::Type::Bool, "true"}},
+            {"false_val", {ConfigNode::Type::Bool, "false"}},
+            {"null_val", {ConfigNode::Type::Null, "null"}},
         };
 
-        for (const auto& child : result.root.children) {
+        for(const auto &child : result.root.children) {
             auto it = expected.find(child.key);
-            QVERIFY2(it != expected.end(),
-                     (std::string("Unexpected key: ") + child.key).c_str());
-            QCOMPARE(child.type,   it->second.first);
+            QVERIFY2(it != expected.end(), (std::string("Unexpected key: ") + child.key).c_str());
+            QCOMPARE(child.type, it->second.first);
             QCOMPARE(child.scalar, it->second.second);
         }
     }
@@ -136,17 +137,72 @@ private slots:
     {
         auto result = m_parser.parse(readFixture("sample.jsonc"));
         QVERIFY(result.ok);
-        // nlohmann strips comments in v1 — comment field is always empty
-        std::function<bool(const ConfigNode&)> allCommentsEmpty =
-            [&](const ConfigNode& node) -> bool {
-                if (!node.comment.empty())
-                    return false;
-                for (const auto& c : node.children)
-                    if (!allCommentsEmpty(c))
-                        return false;
-                return true;
-            };
-        QVERIFY(allCommentsEmpty(result.root));
+
+        // The standalone comment "This is a sample JSONC file with comments"
+        // (line 2) is assigned to the first key "name"
+        auto findKey = [](const ConfigNode &parent, const std::string &key) -> const ConfigNode * {
+            for(const auto &c : parent.children)
+                if(c.key == key)
+                    return &c;
+            return nullptr;
+        };
+
+        const auto *nameNode = findKey(result.root, "name");
+        QVERIFY(nameNode != nullptr);
+        QCOMPARE(QString::fromStdString(nameNode->comment),
+                 QString("This is a sample JSONC file with comments"));
+    }
+
+    void test_trailingComment()
+    {
+        const auto *data = R"({
+            "key": "value" // trailing comment
+        })";
+        auto result = m_parser.parse(data);
+        QVERIFY(result.ok);
+        QCOMPARE(result.root.children.size(), size_t(1));
+        QCOMPARE(QString::fromStdString(result.root.children[0].comment),
+                 QString("trailing comment"));
+    }
+
+    void test_standaloneComment()
+    {
+        const auto *data = R"({
+            // first comment
+            "a": 1,
+            "b": 2,
+            // above c
+            "c": 3
+        })";
+        auto result = m_parser.parse(data);
+        QVERIFY(result.ok);
+        QCOMPARE(result.root.children.size(), size_t(3));
+
+        auto f = [](const ConfigNode &p, const std::string &k) -> const ConfigNode * {
+            for(const auto &c : p.children)
+                if(c.key == k)
+                    return &c;
+            return nullptr;
+        };
+
+        const auto *aNode = f(result.root, "a");
+        QVERIFY(aNode != nullptr);
+        QCOMPARE(QString::fromStdString(aNode->comment), QString("first comment"));
+
+        const auto *bNode = f(result.root, "b");
+        QVERIFY(bNode != nullptr);
+        QVERIFY(bNode->comment.empty());
+
+        const auto *cNode = f(result.root, "c");
+        QVERIFY(cNode != nullptr);
+        QCOMPARE(QString::fromStdString(cNode->comment), QString("above c"));
+    }
+
+    void test_brokenFile()
+    {
+        auto result = m_parser.parse(readFixture("broken.jsonc"));
+        QVERIFY(!result.ok);
+        QVERIFY(!result.error.empty());
     }
 };
 

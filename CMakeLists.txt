@@ -18,6 +18,7 @@ find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Svg)
 
 # ---- SeerSdk (plugin host interface) ----
 include(FetchContent)
+message(STATUS "Fetching third-party dependencies... seer-sdk")
 FetchContent_Declare(SeerSdk
     GIT_REPOSITORY https://github.com/ccseer/Seer-sdk.git
     GIT_TAG        main
@@ -97,6 +98,11 @@ set(UI_SOURCES
     src/ui/search_bar.cpp
     src/ui/status_bar.h
     src/ui/status_bar.cpp
+    src/ui/style_assets.h
+    src/ui/tree_filter_proxy.h
+    src/ui/tree_filter_proxy.cpp
+    src/ui/tree_model.h
+    src/ui/tree_model.cpp
     src/ui/tree_renderer.h
     src/ui/tree_renderer.cpp
     src/ui/data_tree_viewer.h
@@ -105,7 +111,6 @@ set(UI_SOURCES
 
 # ---- DataTreeViewer DLL ----
 add_library(datatreeviewer SHARED
-    plugin_main.cpp
     ${CORE_SOURCES}
     ${PARSER_SOURCES}
     ${WORKER_SOURCES}
@@ -129,17 +134,19 @@ target_link_libraries(datatreeviewer PRIVATE
 set_target_properties(datatreeviewer PROPERTIES
     OUTPUT_NAME "datatreeviewer" SUFFIX ".dll")
 
-# ---- Demo executable ----
-add_executable(datatreeviewer_demo WIN32 src/demo_host.cpp)
-target_include_directories(datatreeviewer_demo PRIVATE src/ ${simpleini_SOURCE_DIR})
-target_link_libraries(datatreeviewer_demo PRIVATE
-    datatreeviewer SeerSdk::SeerSdk Qt6::Core Qt6::Gui Qt6::Widgets)
+# Copy plugin.json to output dir (Seer plugin discovery needs it alongside the DLL)
+add_custom_command(TARGET datatreeviewer POST_BUILD
+    COMMAND "${CMAKE_COMMAND}" -E copy_if_different
+        "${CMAKE_SOURCE_DIR}/bin/plugin.json"
+        "$<TARGET_FILE_DIR:datatreeviewer>/plugin.json")
 
 # ---- Seer Integration Test ----
 add_executable(datatreeviewer_test WIN32 src/test.cpp)
 target_include_directories(datatreeviewer_test PRIVATE src/ ${simpleini_SOURCE_DIR})
 target_link_libraries(datatreeviewer_test PRIVATE
     datatreeviewer SeerSdk::SeerSdk Qt6::Core Qt6::Gui Qt6::Widgets)
+set_target_properties(datatreeviewer_test PROPERTIES
+    VS_STARTUP_PROJECT ON)
 
 # ---- Tests ----
 option(BUILD_TESTS "Build parser unit tests" ON)
