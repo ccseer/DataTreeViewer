@@ -47,7 +47,6 @@ private:
     void onFilterChanged(const QString &text);
     void onTextViewBtnClicked();
     void showError(const std::string &message, int errLine, const std::string &title = "ERROR");
-    void updateStatusTooltip();
     void reapplyStyles();
 
     BreadcrumbBar *m_breadcrumb = nullptr;

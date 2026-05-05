@@ -1,0 +1,22 @@
+{
+  "name": "DataTreeViewer",
+  "version": "1.0.0",
+  "type": "dll",
+  "roles": [
+    "viewer"
+  ],
+  "entry": "datatreeviewer.dll",
+  "formats": [
+    "jsonc",
+    "yaml",
+    "yml",
+    "ini",
+    "cfg",
+    "conf",
+    "toml",
+    "tml"
+  ],
+  "appMinVersion": "4.2.9",
+  "author": "corey",
+  "description": "Seer plugin for read-only tree-structured data preview (JSONC, YAML, INI, TOML)"
+}

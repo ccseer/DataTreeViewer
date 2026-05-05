@@ -57,6 +57,41 @@ private slots:
         QVERIFY(!result.root.children.empty());
     }
 
+    void test_wsjcppManifest()
+    {
+        auto result = m_parser.parse(
+            "wsjcpp_version: \"v0.1.1\"\n"
+            "cmake_minimum_required: \"3.0\"\n"
+            "cmake_cxx_standard: \"11\"\n"
+            "name: \"nlohmann/json\"\n"
+            "version: \"v3.11.3\"\n"
+            "description: \"JSON for Modern C++\"\n"
+            "issues: \"https://github.com/nlohmann/json/issues\"\n"
+            "keywords:\n"
+            "  - \"c++\"\n"
+            "  - \"json\"\n"
+            "\n"
+            "repositories:\n"
+            "  - type: main\n"
+            "    url: \"https://github.com/nlohmann/json\"\n"
+            "\n"
+            "authors:\n"
+            "  - name: \"Niels Lohmann\"\n"
+            "    email: \"mail@nlohmann.me\"\n"
+            "\n"
+            "distribution:\n"
+            "  - source-file: \"single_include/nlohmann/json.hpp\"\n"
+            "    target-file: \"json.hpp\"\n"
+            "    type: \"source-code\"\n"
+            "  - source-file: \"single_include/nlohmann/json_fwd.hpp\"\n"
+            "    target-file: \"json_fwd.hpp\"\n"
+            "    type: \"source-code\"\n");
+        QVERIFY2(result.ok, result.error.c_str());
+        QVERIFY(!result.has_parse_error);
+        QCOMPARE(result.root.type, ConfigNode::Type::Object);
+        QVERIFY(!result.root.children.empty());
+    }
+
     void test_parseInvalid_data()
     {
         QTest::addColumn<QString>("input");
@@ -148,11 +183,115 @@ private slots:
         QCOMPARE(summary->type, ConfigNode::Type::String);
     }
 
+    void test_commentExtraction()
+    {
+        auto result = m_parser.parse(
+            "# leading a\n"
+            "a: 1\n"
+            "b: 2 # inline b\n"
+            "# leading c\n"
+            "c: 3\n");
+        QVERIFY2(result.ok, result.error.c_str());
+
+        auto findByKey = [](const ConfigNode &parent,
+                            const std::string &key) -> const ConfigNode * {
+            for(const auto &c : parent.children)
+                if(c.key == key)
+                    return &c;
+            return nullptr;
+        };
+
+        const auto *aNode = findByKey(result.root, "a");
+        QVERIFY(aNode != nullptr);
+        QCOMPARE(QString::fromStdString(aNode->comment), QString("leading a"));
+
+        const auto *bNode = findByKey(result.root, "b");
+        QVERIFY(bNode != nullptr);
+        QCOMPARE(QString::fromStdString(bNode->comment), QString("inline b"));
+
+        const auto *cNode = findByKey(result.root, "c");
+        QVERIFY(cNode != nullptr);
+        QCOMPARE(QString::fromStdString(cNode->comment), QString("leading c"));
+
+        auto fixture = m_parser.parse(readFixture("sample.yaml"));
+        QVERIFY2(fixture.ok, fixture.error.c_str());
+        const auto *commentedNode = findByKey(fixture.root, "commented_key");
+        QVERIFY(commentedNode != nullptr);
+        QCOMPARE(QString::fromStdString(commentedNode->comment), QString("inline value comment"));
+    }
+
+    void test_hashInsideQuotedScalarIsNotComment()
+    {
+        auto result = m_parser.parse(
+            "single: 'value # not comment'\n"
+            "double: \"value # not comment\"\n"
+            "plain: value # real comment\n");
+        QVERIFY2(result.ok, result.error.c_str());
+
+        auto findByKey = [](const ConfigNode &parent,
+                            const std::string &key) -> const ConfigNode * {
+            for(const auto &c : parent.children)
+                if(c.key == key)
+                    return &c;
+            return nullptr;
+        };
+
+        const auto *singleNode = findByKey(result.root, "single");
+        QVERIFY(singleNode != nullptr);
+        QVERIFY(singleNode->comment.empty());
+        QCOMPARE(singleNode->scalar, std::string("value # not comment"));
+
+        const auto *doubleNode = findByKey(result.root, "double");
+        QVERIFY(doubleNode != nullptr);
+        QVERIFY(doubleNode->comment.empty());
+        QCOMPARE(doubleNode->scalar, std::string("value # not comment"));
+
+        const auto *plainNode = findByKey(result.root, "plain");
+        QVERIFY(plainNode != nullptr);
+        QCOMPARE(QString::fromStdString(plainNode->comment), QString("real comment"));
+    }
+
+    void test_quotedScalarsStayStrings()
+    {
+        auto result = m_parser.parse(
+            "quoted_int: \"42\"\n"
+            "quoted_bool: 'true'\n"
+            "plain_int: 42\n"
+            "literal_bool: |\n"
+            "  true\n");
+        QVERIFY2(result.ok, result.error.c_str());
+
+        auto findByKey = [](const ConfigNode &parent,
+                            const std::string &key) -> const ConfigNode * {
+            for(const auto &c : parent.children)
+                if(c.key == key)
+                    return &c;
+            return nullptr;
+        };
+
+        const auto *quotedInt = findByKey(result.root, "quoted_int");
+        QVERIFY(quotedInt != nullptr);
+        QCOMPARE(quotedInt->type, ConfigNode::Type::String);
+
+        const auto *quotedBool = findByKey(result.root, "quoted_bool");
+        QVERIFY(quotedBool != nullptr);
+        QCOMPARE(quotedBool->type, ConfigNode::Type::String);
+
+        const auto *plainInt = findByKey(result.root, "plain_int");
+        QVERIFY(plainInt != nullptr);
+        QCOMPARE(plainInt->type, ConfigNode::Type::Integer);
+
+        const auto *literalBool = findByKey(result.root, "literal_bool");
+        QVERIFY(literalBool != nullptr);
+        QCOMPARE(literalBool->type, ConfigNode::Type::String);
+    }
+
     void test_brokenFile()
     {
         auto result = m_parser.parse(readFixture("broken.yaml"));
         QVERIFY(result.ok);
         QVERIFY(result.has_parse_error);
+        QVERIFY(result.err_line > 0);
         verifyParseErrorTree(result);
     }
 };

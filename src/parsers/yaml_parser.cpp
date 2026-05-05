@@ -2,10 +2,55 @@
 
 #include <ryml.hpp>
 
+#include <stdexcept>
+#include <iostream>
+#include <utility>
+
 #include "core/parser_registry.h"
 #include "core/parser_helpers.h"
 
+#ifdef _WIN32
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#endif
+
 namespace {
+
+void traceYaml(const std::string &message)
+{
+    const std::string line = "[YamlParser] " + message;
+#ifdef _WIN32
+    OutputDebugStringA((line + "\n").c_str());
+#endif
+    std::clog << line << std::endl;
+}
+
+struct YamlParseException : public std::runtime_error {
+    YamlParseException(std::string message, int errorLine)
+        : std::runtime_error(std::move(message)),
+          line(errorLine)
+    {
+    }
+
+    int line = -1;
+};
+
+[[noreturn]] void yamlErrorCallback(const char* msg, size_t msgLen, ryml::Location location,
+                                    void*)
+{
+    throw YamlParseException(std::string(msg, msgLen),
+                             location.line > 0 ? static_cast<int>(location.line) : -1);
+}
+
+ryml::Callbacks yamlCallbacks()
+{
+    return ryml::Callbacks(nullptr, nullptr, nullptr, yamlErrorCallback);
+}
 
 ConfigNode::Type deduceScalarType(c4::csubstr val)
 {
@@ -57,18 +102,16 @@ ConfigNode::Type deduceScalarType(c4::csubstr val)
     return ConfigNode::Type::String;
 }
 
-int resolveLine(const char* ptr, const char* bufferStart)
+int resolveLine(const ryml::Parser &parser, ryml::ConstNodeRef node)
 {
-    if (!ptr || !bufferStart || ptr < bufferStart) return -1;
-    int line = 1;
-    for (const char* p = bufferStart; p < ptr; ++p) {
-        if (*p == '\n') line++;
-    }
-    return line;
+    ryml::Location loc = parser.location(node);
+    return loc ? static_cast<int>(loc.line) + 1 : -1;
 }
 
-void walk(ryml::ConstNodeRef node, const char* bufferStart, ConfigNode& out)
+void walk(ryml::ConstNodeRef node, const ryml::Parser &parser, ConfigNode& out)
 {
+    out.source_line = resolveLine(parser, node);
+
     if (node.is_map()) {
         out.type = ConfigNode::Type::Object;
         for (auto child : node.children()) {
@@ -76,29 +119,21 @@ void walk(ryml::ConstNodeRef node, const char* bufferStart, ConfigNode& out)
             if (child.has_key()) {
                 auto k = child.key();
                 childNode.key = std::string(k.data(), k.size());
-                childNode.source_line = resolveLine(k.data(), bufferStart);
             }
-            walk(child, bufferStart, childNode);
+            walk(child, parser, childNode);
             out.children.push_back(std::move(childNode));
         }
     } else if (node.is_seq()) {
         out.type = ConfigNode::Type::Array;
         for (auto child : node.children()) {
             ConfigNode childNode;
-            walk(child, bufferStart, childNode);
-            // For seq members, if it's a scalar, try to get line
-            if (child.has_val()) {
-                childNode.source_line = resolveLine(child.val().data(), bufferStart);
-            }
+            walk(child, parser, childNode);
             out.children.push_back(std::move(childNode));
         }
     } else if (node.has_val()) {
         auto v = node.val();
-        out.type = deduceScalarType(v);
+        out.type = node.is_val_quoted() ? ConfigNode::Type::String : deduceScalarType(v);
         out.scalar = std::string(v.data(), v.size());
-        if (out.source_line <= 0) {
-            out.source_line = resolveLine(v.data(), bufferStart);
-        }
     } else {
         out.type = ConfigNode::Type::Null;
     }
@@ -111,22 +146,41 @@ ParseResult YamlParser::parse(std::string_view data)
     ParseResult result;
 
     try {
+        traceYaml("parse enter, bytes=" + std::to_string(data.size()));
         c4::csubstr yaml(data.data(), data.size());
-        ryml::Tree tree = ryml::parse_in_arena(yaml);
+        ryml::Parser::handler_type eventHandler(yamlCallbacks());
+        ryml::ParserOptions parserOptions;
+        parserOptions.locations(true);
+        ryml::Parser parser(&eventHandler, parserOptions);
+        ryml::Tree tree(parser.callbacks());
+        ryml::parse_in_arena(&parser, yaml, &tree);
+        traceYaml("rapidyaml parse returned, empty=" + std::to_string(tree.empty()));
 
         if (tree.empty()) {
             result.ok = true;
             result.root.type = ConfigNode::Type::Null;
             return result;
         }
+        traceYaml("root children=" + std::to_string(tree.rootref().num_children()));
 
-        walk(tree.rootref(), data.data(), result.root);
+        walk(tree.rootref(), parser, result.root);
+        traceYaml("walk complete, children=" + std::to_string(result.root.children.size()));
 
         auto commentMap = dtv::core::extractComments(data);
         dtv::core::applyComments(result.root, commentMap);
+        traceYaml("comments applied");
 
         result.ok = true;
+        traceYaml("parse leave ok");
+    } catch (const YamlParseException& e) {
+        traceYaml("rapidyaml parse error: " + std::string(e.what()));
+        result.root = dtv::core::createErrorNode(e.what(), e.line);
+        result.ok   = true;
+        result.has_parse_error = true;
+        result.error = e.what();
+        result.err_line = e.line;
     } catch (const std::exception& e) {
+        traceYaml("std::exception: " + std::string(e.what()));
         result.root = dtv::core::createErrorNode(e.what());
         result.ok   = true;
         result.has_parse_error = true;

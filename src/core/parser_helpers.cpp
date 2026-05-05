@@ -83,11 +83,30 @@ CommentMap extractComments(std::string_view data)
                     comment_start = start + 2;
                 } else {
                     // Look for inline comment
-                    bool in_str = false;
+                    char quote = 0;
                     for(size_t i = 0; i < line.size(); ++i) {
-                        if(line[i] == '"' && (i == 0 || line[i - 1] != '\\'))
-                            in_str = !in_str;
-                        if(!in_str) {
+                        if(quote != 0) {
+                            if(line[i] == quote) {
+                                bool escaped = false;
+                                if(quote == '"') {
+                                    size_t k = i;
+                                    while(k > 0 && line[k - 1] == '\\') {
+                                        escaped = !escaped;
+                                        --k;
+                                    }
+                                }
+                                if(!escaped)
+                                    quote = 0;
+                            }
+                            continue;
+                        }
+
+                        if(line[i] == '"' || line[i] == '\'') {
+                            quote = line[i];
+                            continue;
+                        }
+
+                        {
                             if(line[i] == '#' ||
                                (line[i] == '/' && i + 1 < line.size() && line[i + 1] == '/')) {
                                 comment_start = i + ((line[i] == '#') ? 1 : 2);

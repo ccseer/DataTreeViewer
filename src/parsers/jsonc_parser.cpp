@@ -6,7 +6,6 @@
 #include <cctype>
 #include <iostream>
 #include <queue>
-#include <regex>
 #include <string_view>
 
 #include "core/parser_registry.h"
@@ -43,6 +42,172 @@ void trim(std::string &s) {
     s.erase(s.begin(), it1);
     auto it2 = std::find_if(s.rbegin(), s.rend(), [](unsigned char ch) { return !std::isspace(ch); });
     s.erase(it2.base(), s.end());
+}
+
+size_t findCommentStart(std::string_view line, size_t from = 0)
+{
+    bool inString = false;
+    bool escaped = false;
+
+    for(size_t i = from; i < line.size(); ++i) {
+        char c = line[i];
+
+        if(inString) {
+            if(escaped) {
+                escaped = false;
+            } else if(c == '\\') {
+                escaped = true;
+            } else if(c == '"') {
+                inString = false;
+            }
+            continue;
+        }
+
+        if(c == '"') {
+            inString = true;
+            continue;
+        }
+
+        if(c == '#')
+            return i;
+        if(c == '/' && i + 1 < line.size() && (line[i + 1] == '/' || line[i + 1] == '*'))
+            return i;
+    }
+
+    return std::string_view::npos;
+}
+
+bool findJsonKey(std::string_view line, std::string &key, size_t &valueStart)
+{
+    bool escaped = false;
+    bool inKey = false;
+    size_t keyStart = 0;
+    size_t keyEnd = 0;
+
+    for(size_t i = 0; i < line.size(); ++i) {
+        char c = line[i];
+
+        if(inKey) {
+            if(escaped) {
+                escaped = false;
+            } else if(c == '\\') {
+                escaped = true;
+            } else if(c == '"') {
+                keyEnd = i;
+                inKey = false;
+                size_t j = i + 1;
+                while(j < line.size() && std::isspace(static_cast<unsigned char>(line[j])))
+                    ++j;
+                if(j < line.size() && line[j] == ':') {
+                    key = std::string(line.substr(keyStart, keyEnd - keyStart));
+                    valueStart = j + 1;
+                    return true;
+                }
+            }
+            continue;
+        }
+
+        if(c == '"') {
+            inKey = true;
+            keyStart = i + 1;
+        } else if(c == '/' && i + 1 < line.size() && (line[i + 1] == '/' || line[i + 1] == '*')) {
+            return false;
+        }
+    }
+
+    return false;
+}
+
+std::string commentTextFrom(std::string_view line, size_t commentStart)
+{
+    if(commentStart == std::string_view::npos)
+        return {};
+
+    size_t textStart = commentStart;
+    if(line[commentStart] == '#') {
+        textStart = commentStart + 1;
+    } else if(commentStart + 1 < line.size() &&
+              (line[commentStart + 1] == '/' || line[commentStart + 1] == '*')) {
+        textStart = commentStart + 2;
+    }
+
+    std::string text(line.substr(textStart));
+    size_t blockEnd = text.find("*/");
+    if(blockEnd != std::string::npos)
+        text.erase(blockEnd);
+    trim(text);
+    return text;
+}
+
+std::queue<CommentEntry> collectComments(std::string_view data)
+{
+    std::queue<CommentEntry> comments;
+    std::string pendingComment;
+    std::string blockComment;
+    bool inBlockComment = false;
+
+    size_t pos = 0;
+    while(pos <= data.size()) {
+        size_t nl = data.find('\n', pos);
+        std::string_view line =
+            nl == std::string_view::npos ? data.substr(pos) : data.substr(pos, nl - pos);
+        if(!line.empty() && line.back() == '\r')
+            line.remove_suffix(1);
+
+        if(inBlockComment) {
+            size_t end = line.find("*/");
+            if(end == std::string_view::npos) {
+                blockComment += "\n" + std::string(line);
+            } else {
+                blockComment += "\n" + std::string(line.substr(0, end));
+                trim(blockComment);
+                if(!blockComment.empty())
+                    pendingComment = blockComment;
+                blockComment.clear();
+                inBlockComment = false;
+            }
+
+            if(nl == std::string_view::npos)
+                break;
+            pos = nl + 1;
+            continue;
+        }
+
+        size_t first = line.find_first_not_of(" \t");
+        if(first != std::string_view::npos) {
+            std::string_view content = line.substr(first);
+            if(content.rfind("//", 0) == 0 || content.rfind("#", 0) == 0 ||
+               content.rfind("/*", 0) == 0) {
+                if(content.rfind("/*", 0) == 0 && content.find("*/", 2) == std::string_view::npos) {
+                    blockComment = std::string(content.substr(2));
+                    inBlockComment = true;
+                } else {
+                    std::string text = commentTextFrom(content, 0);
+                    if(!text.empty())
+                        pendingComment = std::move(text);
+                }
+            } else {
+                std::string key;
+                size_t valueStart = 0;
+                if(findJsonKey(line, key, valueStart)) {
+                    size_t inlineComment = findCommentStart(line, valueStart);
+                    std::string text = commentTextFrom(line, inlineComment);
+                    if(!text.empty()) {
+                        comments.push({std::move(key), std::move(text)});
+                    } else if(!pendingComment.empty()) {
+                        comments.push({std::move(key), pendingComment});
+                        pendingComment.clear();
+                    }
+                }
+            }
+        }
+
+        if(nl == std::string_view::npos)
+            break;
+        pos = nl + 1;
+    }
+
+    return comments;
 }
 
 int estimateErrorLine(std::string_view data)
@@ -89,17 +254,14 @@ int estimateErrorLine(std::string_view data)
     return line;
 }
 
-std::string stripComments(const std::string_view &data, std::queue<CommentEntry> &outComments)
+std::string stripComments(const std::string_view &data)
 {
     std::string clean;
     clean.reserve(data.size());
 
-    std::string pending_comment;
     bool in_str = false;
     bool in_block = false;
     bool in_line = false;
-
-    std::string current_comment;
 
     for (size_t i = 0; i < data.size(); ++i) {
         char c = data[i];
@@ -110,13 +272,9 @@ std::string stripComments(const std::string_view &data, std::queue<CommentEntry>
                 in_block = false;
                 i++;
                 clean.append("  ");
-                trim(current_comment);
-                if (!current_comment.empty()) pending_comment = current_comment;
-                current_comment.clear();
             } else {
                 if (c == '\n') clean.push_back('\n');
                 else clean.push_back(' ');
-                current_comment.push_back(c);
             }
             continue;
         }
@@ -125,12 +283,8 @@ std::string stripComments(const std::string_view &data, std::queue<CommentEntry>
             if (c == '\n') {
                 in_line = false;
                 clean.push_back('\n');
-                trim(current_comment);
-                if (!current_comment.empty()) pending_comment = current_comment;
-                current_comment.clear();
             } else {
                 clean.push_back(' ');
-                current_comment.push_back(c);
             }
             continue;
         }
@@ -152,22 +306,6 @@ std::string stripComments(const std::string_view &data, std::queue<CommentEntry>
         if (c == '"') {
             in_str = true;
             clean.push_back(c);
-
-            if (!pending_comment.empty()) {
-                size_t line_start = clean.rfind('\n');
-                if (line_start == std::string::npos) line_start = 0;
-                else line_start++;
-
-                if (line_start < clean.size()) {
-                    std::string current_line = clean.substr(line_start);
-                    std::regex key_re(R"re("([^"]+)"\s*:)re");
-                    std::smatch m;
-                    if (std::regex_search(current_line, m, key_re)) {
-                        outComments.push({m[1].str(), pending_comment});
-                        pending_comment.clear();
-                    }
-                }
-            }
             continue;
         }
 
@@ -261,7 +399,8 @@ ParseResult JsoncParser::parse(std::string_view data)
     traceJsonc("parse enter, bytes=" + std::to_string(data.size()));
 
     try {
-        std::string clean = stripComments(data, comments);
+        comments = collectComments(data);
+        std::string clean = stripComments(data);
         traceJsonc("comments stripped, clean bytes=" + std::to_string(clean.size()) +
                    ", pending comments=" + std::to_string(comments.size()));
 
@@ -312,9 +451,7 @@ void JsoncParser::registerSelf()
     auto &reg = ParserRegistry::instance();
     reg.registerParser("json", [] { return std::make_unique<JsoncParser>(); });
     reg.registerParser("jsonc", [] { return std::make_unique<JsoncParser>(); });
-    reg.registerParser("json5", [] { return std::make_unique<JsoncParser>(); });
 }
 
 REGISTER_PARSER("json", JsoncParser)
 REGISTER_PARSER("jsonc", JsoncParser)
-REGISTER_PARSER("json5", JsoncParser)

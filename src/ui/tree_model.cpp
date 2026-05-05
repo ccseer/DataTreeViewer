@@ -14,6 +14,33 @@
 #include "core/config_node.h"
 #include "style_assets.h"
 
+namespace {
+
+QString visibleScalar(const ConfigNode &node)
+{
+    QString text = QString::fromStdString(node.scalar);
+    text.replace(QStringLiteral("\r\n"), QStringLiteral("\n"));
+    text.remove('\r');
+
+    while(true) {
+        int newline = text.indexOf('\n');
+        if(newline < 0 || !text.left(newline).trimmed().isEmpty())
+            break;
+        text.remove(0, newline + 1);
+    }
+
+    while(true) {
+        int newline = text.lastIndexOf('\n');
+        if(newline < 0 || !text.mid(newline + 1).trimmed().isEmpty())
+            break;
+        text.truncate(newline);
+    }
+
+    return text;
+}
+
+} // namespace
+
 TreeModel::TreeModel(QObject *parent) : QAbstractItemModel(parent)
 {
     refreshIcons();
@@ -163,7 +190,7 @@ QVariant TreeModel::data(const QModelIndex &index, int role) const
         if(col == 1) {
             if(node->is_container())
                 return containerHint(*node);
-            return QString::fromStdString(node->scalar);
+            return visibleScalar(*node);
         }
     }
 
@@ -171,7 +198,7 @@ QVariant TreeModel::data(const QModelIndex &index, int role) const
         if(!node->comment.empty())
             return QString::fromStdString(node->comment);
         if(col == 1 && !node->is_container())
-            return QString::fromStdString(node->scalar);
+            return visibleScalar(*node);
     }
 
     if(role == Qt::DecorationRole && col == 0) {
@@ -218,7 +245,8 @@ QVariant TreeModel::data(const QModelIndex &index, int role) const
     if(role == Qt::SizeHintRole) {
         int lines = 1;
         if(col == 1 && !node->scalar.empty()) {
-            lines = static_cast<int>(std::count(node->scalar.begin(), node->scalar.end(), '\n')) + 1;
+            const QString text = visibleScalar(*node);
+            lines = text.count('\n') + 1;
             lines = std::min(lines, 10); // Cap at 10 lines for sanity
         }
         if(!node->comment.empty())

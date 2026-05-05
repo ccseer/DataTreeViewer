@@ -141,6 +141,8 @@ void StatusBar::updateTheme(bool dark, qreal dpr)
     m_isDarkMode = dark;
     m_dpr = dpr;
     setFixedHeight(qRound(26 * m_dpr));
+    const int infoBox = qRound(24 * m_dpr);
+    m_info->setFixedSize(infoBox, infoBox);
     if(auto *lay = qobject_cast<QHBoxLayout *>(layout()))
         lay->setContentsMargins(qRound(12 * m_dpr), 0, qRound(12 * m_dpr), 0);
     if(m_hasLoadInfo)
@@ -167,7 +169,7 @@ void StatusBar::repaintInfoIcon()
 
     QColor iconColor(Colors::Accent);
 
-    int iconSize = qRound(18 * m_dpr);
+    int iconSize = qRound(20 * m_dpr);
     QIcon icon = dtv::ui::createMultiStateIcon(g_svg_info, iconColor, iconSize);
     m_info->setPixmap(icon.pixmap(iconSize, iconSize));
     m_info->setToolTip(m_tooltipLines);

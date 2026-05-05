@@ -211,6 +211,29 @@ private slots:
         QCOMPARE(QString::fromStdString(cNode->comment), QString("above c"));
     }
 
+    void test_blockComment()
+    {
+        const auto *data = R"({
+            /* Multi-line
+               comment block */
+            "unicode": "Hello"
+        })";
+        auto result = m_parser.parse(data);
+        QVERIFY(result.ok);
+
+        const ConfigNode *unicodeNode = nullptr;
+        for(const auto &child : result.root.children) {
+            if(child.key == "unicode") {
+                unicodeNode = &child;
+                break;
+            }
+        }
+
+        QVERIFY(unicodeNode != nullptr);
+        QCOMPARE(QString::fromStdString(unicodeNode->comment),
+                 QString("Multi-line\n               comment block"));
+    }
+
     void test_brokenFile()
     {
         auto result = m_parser.parse(readFixture("broken.jsonc"));

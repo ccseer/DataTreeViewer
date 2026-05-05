@@ -23,6 +23,29 @@
 
 namespace {
 
+QString visibleScalar(const ConfigNode &node)
+{
+    QString text = QString::fromStdString(node.scalar);
+    text.replace(QStringLiteral("\r\n"), QStringLiteral("\n"));
+    text.remove('\r');
+
+    while(true) {
+        int newline = text.indexOf('\n');
+        if(newline < 0 || !text.left(newline).trimmed().isEmpty())
+            break;
+        text.remove(0, newline + 1);
+    }
+
+    while(true) {
+        int newline = text.lastIndexOf('\n');
+        if(newline < 0 || !text.mid(newline + 1).trimmed().isEmpty())
+            break;
+        text.truncate(newline);
+    }
+
+    return text;
+}
+
 QString statusValueForNode(const ConfigNode &node)
 {
     QString value;
@@ -33,9 +56,8 @@ QString statusValueForNode(const ConfigNode &node)
         else
             value = QString("{%1 keys}").arg(childCount);
     } else {
-        value = QString::fromStdString(node.scalar);
+        value = visibleScalar(node);
         value.replace('\n', QStringLiteral("\\n"));
-        value.remove('\r');
     }
 
     constexpr int kMaxStatusChars = 80;
