@@ -1,6 +1,8 @@
 #include <QFile>
 #include <QTest>
 
+#include <vector>
+
 #include "parsers/ini_parser.h"
 
 class TestIniParser : public QObject {
@@ -15,6 +17,13 @@ private:
         QFile f(path);
         f.open(QIODevice::ReadOnly | QIODevice::Text);
         return f.readAll().toStdString();
+    }
+
+    void verifyParseErrorTree(const ParseResult &result)
+    {
+        QVERIFY(!result.root.children.empty());
+        QCOMPARE(result.root.children.front().key, std::string("PARSE ERROR"));
+        QVERIFY(!result.root.children.front().children.empty());
     }
 
 private slots:
@@ -71,13 +80,47 @@ private slots:
         auto result = m_parser.parse(readFixture("sample.ini"));
         QVERIFY(result.ok);
 
-        // SimpleIni does not expose comments — all comment fields should be empty
-        bool allEmpty = true;
+        const ConfigNode *general = nullptr;
+        const ConfigNode *network = nullptr;
+        const ConfigNode *logging = nullptr;
         for(const auto &child : result.root.children) {
-            if(!child.comment.empty())
-                allEmpty = false;
+            if(child.key == "General")
+                general = &child;
+            if(child.key == "Network")
+                network = &child;
+            if(child.key == "Logging")
+                logging = &child;
         }
-        QVERIFY(allEmpty);
+
+        QVERIFY(general != nullptr);
+        QCOMPARE(QString::fromStdString(general->comment),
+                 QString("INI sample for DataTreeViewer testing\nComment using semicolon"));
+
+        QVERIFY(network != nullptr);
+        QCOMPARE(QString::fromStdString(network->comment), QString("Comment using hash"));
+
+        QVERIFY(logging != nullptr);
+        QCOMPARE(QString::fromStdString(logging->comment),
+                 QString("Duplicate keys in same section — both should appear"));
+    }
+
+    void test_keyComments()
+    {
+        auto result = m_parser.parse(
+            "[General]\n"
+            "; leading key\n"
+            "name = DataTreeViewer\n"
+            "version = 1.0 ; inline version\n");
+        QVERIFY(result.ok);
+        QVERIFY(!result.root.children.empty());
+
+        const auto &general = result.root.children.front();
+        QCOMPARE(general.children.size(), size_t(2));
+        QCOMPARE(general.children[0].key, std::string("name"));
+        QCOMPARE(QString::fromStdString(general.children[0].comment), QString("leading key"));
+        QCOMPARE(general.children[1].key, std::string("version"));
+        QCOMPARE(general.children[1].scalar, std::string("1.0"));
+        QCOMPARE(QString::fromStdString(general.children[1].comment), QString("inline version"));
     }
 
     void test_duplicateKeys()
@@ -120,12 +163,45 @@ private slots:
         QVERIFY(foundDisplay);
     }
 
+    void test_preservesLoadOrder()
+    {
+        auto result = m_parser.parse(readFixture("sample.ini"));
+        QVERIFY(result.ok);
+
+        std::vector<std::string> expected = {
+            "General", "Network", "Logging", "Display", "EmptySection",
+            "EmptySection.Sub", "EmptySection2"
+        };
+        QCOMPARE(result.root.children.size(), expected.size());
+        for(size_t i = 0; i < expected.size(); ++i)
+            QCOMPARE(result.root.children[i].key, expected[i]);
+    }
+
+    void test_sourceLines()
+    {
+        auto result = m_parser.parse(readFixture("sample.ini"));
+        QVERIFY(result.ok);
+
+        const ConfigNode *general = nullptr;
+        for(const auto &child : result.root.children) {
+            if(child.key == "General") {
+                general = &child;
+                break;
+            }
+        }
+        QVERIFY(general != nullptr);
+        QCOMPARE(general->source_line, 4);
+        QVERIFY(!general->children.empty());
+        QCOMPARE(general->children.front().source_line, 5);
+    }
+
     void test_brokenFile()
     {
         auto result = m_parser.parse(readFixture("broken.ini"));
-        // SimpleIni is very forgiving — even broken INI might parse ok without error
-        // Just verify it does not crash
-        QVERIFY(result.ok || !result.error.empty());
+        QVERIFY(result.ok);
+        QVERIFY(result.has_parse_error);
+        QCOMPARE(result.err_line, 1);
+        verifyParseErrorTree(result);
     }
 };
 
