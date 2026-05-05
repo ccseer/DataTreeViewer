@@ -9,6 +9,7 @@
 struct ParseResult {
     ConfigNode  root;
     bool        ok       = false;
+    bool        has_parse_error = false;
     std::string error;
     int         err_line = -1;
 

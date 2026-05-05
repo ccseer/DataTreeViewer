@@ -62,7 +62,9 @@ private slots:
     {
         QFETCH(QString, input);
         auto result = m_parser.parse(input.toStdString());
-        QVERIFY(!result.ok);
+        QVERIFY(result.ok);
+        QVERIFY(result.has_parse_error);
+        QCOMPARE(result.root.key, std::string("PARSE ERROR"));
     }
 
     void test_nestedContainers()
@@ -138,7 +140,9 @@ private slots:
     void test_brokenFile()
     {
         auto result = m_parser.parse(readFixture("broken.toml"));
-        QVERIFY(!result.ok);
+        QVERIFY(result.ok);
+        QVERIFY(result.has_parse_error);
+        QCOMPARE(result.root.key, std::string("PARSE ERROR"));
     }
 };
 

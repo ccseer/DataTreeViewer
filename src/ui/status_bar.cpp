@@ -35,10 +35,13 @@ StatusBar::StatusBar(QWidget *parent) : QWidget(parent)
     m_lineLabel->setStyleSheet("color: gray;");
     layout->addWidget(m_lineLabel, 0);
 
-    layout->addStretch(1);
+    m_valueLabel = new QLabel(this);
+    m_valueLabel->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+    m_valueLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
+    layout->addWidget(m_valueLabel, 1);
 
     m_info = new QLabel(this);
-    m_info->setAlignment(Qt::AlignCenter);
+    m_info->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
     m_info->setCursor(Qt::ArrowCursor);
     m_info->setToolTip("DataTreeViewer");
     layout->addWidget(m_info, 0);
@@ -92,12 +95,25 @@ void StatusBar::setSourceLine(int line)
         m_lineLabel->clear();
 }
 
+void StatusBar::setValueText(const QString &text)
+{
+    if(text.isEmpty()) {
+        m_valueLabel->clear();
+        m_valueLabel->setToolTip({});
+        return;
+    }
+
+    m_valueLabel->setText(text);
+    m_valueLabel->setToolTip(text);
+}
+
 void StatusBar::showLoading()
 {
     m_hasLoadInfo = false;
     m_info->setPixmap(QPixmap());
     m_info->setText("Loading...");
     m_info->setToolTip("DataTreeViewer");
+    setValueText({});
     m_progress->show();
 }
 
@@ -106,6 +122,18 @@ void StatusBar::showFilterNoHits(const QString &text)
     m_info->setPixmap(QPixmap());
     m_info->setText(QString("No matches for \"%1\"").arg(text));
     m_info->setToolTip(QString("No matches for \"%1\"").arg(text));
+}
+
+void StatusBar::restoreInfo()
+{
+    m_info->setText({});
+    if(m_hasLoadInfo)
+        repaintInfoIcon();
+    else {
+        m_info->setPixmap(QPixmap());
+        m_info->setToolTip("DataTreeViewer");
+    }
+    m_progress->hide();
 }
 
 void StatusBar::updateTheme(bool dark, qreal dpr)
@@ -123,6 +151,7 @@ void StatusBar::clear()
     m_info->clear();
     m_info->setToolTip("DataTreeViewer");
     m_lineLabel->clear();
+    setValueText({});
     m_progress->hide();
 }
 
@@ -133,11 +162,10 @@ void StatusBar::repaintInfoIcon()
 
     using namespace dtv::ui;
 
-    QColor iconColor = m_isDarkMode ? QColor(100, 181, 246) // Material Blue 300
-                                    : QColor("#2196F3");    // Material Blue 500
+    QColor iconColor(Colors::Accent);
 
     int iconSize = qRound(18 * m_dpr);
-    QIcon icon = svgIcon(g_svg_info, iconColor, iconSize);
+    QIcon icon = dtv::ui::createMultiStateIcon(g_svg_info, iconColor, iconSize);
     m_info->setPixmap(icon.pixmap(iconSize, iconSize));
     m_info->setToolTip(m_tooltipLines);
 }

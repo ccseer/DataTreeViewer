@@ -15,8 +15,10 @@ public:
     void setLoadInfo(int nodeCount, qint64 fileBytes, qint64 elapsedMs, const QString &formatName,
                      const QString &libraryCredit);
     void setSourceLine(int line);
+    void setValueText(const QString &text);
     void showLoading();
     void showFilterNoHits(const QString &text);
+    void restoreInfo();
     void updateTheme(bool dark, qreal dpr);
     void clear();
 
@@ -26,6 +28,7 @@ private:
     BreadcrumbBar *m_breadcrumb = nullptr;
     QLabel *m_info = nullptr;
     QLabel *m_lineLabel = nullptr;
+    QLabel *m_valueLabel = nullptr;
     QProgressBar *m_progress = nullptr;
 
     bool m_isDarkMode = false;

@@ -1,14 +1,44 @@
 #include "tree_model.h"
 
+#include <algorithm>
 #include <unordered_map>
+#include <vector>
 
+#include <QApplication>
 #include <QColor>
 #include <QFont>
+#include <QHeaderView>
+#include <QPalette>
 
 #include "core/config_node.h"
+#include "style_assets.h"
 
 TreeModel::TreeModel(QObject *parent) : QAbstractItemModel(parent)
-{}
+{
+    refreshIcons();
+}
+
+void TreeModel::setDarkMode(bool on)
+{
+    if(m_isDarkMode == on)
+        return;
+    m_isDarkMode = on;
+    refreshIcons();
+    if(rowCount() > 0)
+        emit dataChanged(index(0, 0), index(rowCount() - 1, columnCount() - 1));
+}
+
+void TreeModel::refreshIcons()
+{
+    using namespace dtv::ui;
+    int sz = 18;
+
+    QColor objColor = m_isDarkMode ? QColor(206, 147, 216) : QColor(156, 39, 176);
+    QColor arrColor = m_isDarkMode ? QColor(128, 222, 234) : QColor(0, 188, 212);
+
+    m_objIcon = createIcon(g_svg_object, objColor, sz);
+    m_arrIcon = createIcon(g_svg_array, arrColor, sz);
+}
 
 void TreeModel::render(const ConfigNode &root)
 {
@@ -29,6 +59,14 @@ void TreeModel::render(const ConfigNode &root)
     endResetModel();
 }
 
+void TreeModel::clear()
+{
+    beginResetModel();
+    m_root = nullptr;
+    m_parents.clear();
+    endResetModel();
+}
+
 const ConfigNode *TreeModel::nodeFromIndex(const QModelIndex &index) const
 {
     if(!index.isValid())
@@ -41,13 +79,7 @@ QModelIndex TreeModel::index(int row, int column, const QModelIndex &parent) con
     if(!m_root || column < 0 || column > 1)
         return {};
 
-    if(!parent.isValid()) {
-        if(row == 0)
-            return createIndex(0, column, const_cast<ConfigNode *>(m_root));
-        return {};
-    }
-
-    const ConfigNode *parentNode = nodeFromIndex(parent);
+    const ConfigNode *parentNode = parent.isValid() ? nodeFromIndex(parent) : m_root;
     if(!parentNode || row < 0 || row >= static_cast<int>(parentNode->children.size()))
         return {};
 
@@ -68,9 +100,8 @@ QModelIndex TreeModel::parent(const QModelIndex &index) const
         return {};
 
     const ConfigNode *parentNode = it->second;
-
     if(parentNode == m_root)
-        return createIndex(0, 0, const_cast<ConfigNode *>(m_root));
+        return {};
 
     // Find row of parentNode in ITS parent
     auto grandIt = m_parents.find(parentNode);
@@ -89,10 +120,8 @@ int TreeModel::rowCount(const QModelIndex &parent) const
 {
     if(!m_root)
         return 0;
-    if(!parent.isValid())
-        return 1; // root node
 
-    const ConfigNode *node = nodeFromIndex(parent);
+    const ConfigNode *node = parent.isValid() ? nodeFromIndex(parent) : m_root;
     if(!node)
         return 0;
     return static_cast<int>(node->children.size());
@@ -115,8 +144,18 @@ QVariant TreeModel::data(const QModelIndex &index, int role) const
     int col = index.column();
 
     if(role == Qt::DisplayRole) {
-        if(col == 0)
+        if(col == 0) {
+            if(node->key.empty()) {
+                auto it = m_parents.find(node);
+                if(it != m_parents.end() && it->second->type == ConfigNode::Type::Array) {
+                    for(size_t i = 0; i < it->second->children.size(); ++i) {
+                        if(&it->second->children[i] == node)
+                            return QString("[%1]").arg(i);
+                    }
+                }
+            }
             return QString::fromStdString(node->key);
+        }
         if(col == 1) {
             if(node->is_container())
                 return containerHint(*node);
@@ -124,29 +163,69 @@ QVariant TreeModel::data(const QModelIndex &index, int role) const
         }
     }
 
-    if(role == Qt::ToolTipRole && !node->comment.empty())
-        return QString::fromStdString(node->comment);
+    if(role == Qt::ToolTipRole) {
+        if(!node->comment.empty())
+            return QString::fromStdString(node->comment);
+        if(col == 1 && !node->is_container())
+            return QString::fromStdString(node->scalar);
+    }
+
+    if(role == Qt::DecorationRole && col == 0) {
+        if(node->type == ConfigNode::Type::Object)
+            return m_objIcon;
+        if(node->type == ConfigNode::Type::Array)
+            return m_arrIcon;
+    }
+
+    if(role == Qt::ForegroundRole) {
+        if(col == 1) {
+            if(node->is_container()) {
+                QColor c = qApp->palette().color(QPalette::Text);
+                c.setAlpha(140); // More dimmed for noise reduction
+                return c;
+            }
+            switch(node->type) {
+            case ConfigNode::Type::String:
+                // Sage Green
+                return m_isDarkMode ? QColor("#A5D6A7") : QColor("#2E7D32");
+            case ConfigNode::Type::Integer:
+            case ConfigNode::Type::Float:
+                // Slate Blue
+                return m_isDarkMode ? QColor("#90CAF9") : QColor("#1565C0");
+            case ConfigNode::Type::Bool:
+                // Warm Amber
+                return m_isDarkMode ? QColor("#FFCC80") : QColor("#E65100");
+            case ConfigNode::Type::Null:
+                return m_isDarkMode ? QColor("#9E9E9E") : QColor("#757575");
+            default:
+                break;
+            }
+        }
+    }
+
+    if(role == Qt::FontRole && col == 0) {
+        QFont f = qApp->font();
+        if(node->is_container())
+            f.setBold(true);
+        return f;
+    }
+
+    if(role == Qt::SizeHintRole) {
+        int lines = 1;
+        if(col == 1 && !node->scalar.empty()) {
+            lines = static_cast<int>(std::count(node->scalar.begin(), node->scalar.end(), '\n')) + 1;
+            lines = std::min(lines, 10); // Cap at 10 lines for sanity
+        }
+        if(!node->comment.empty())
+            ++lines;
+        return QSize(0, 22 + lines * 18); // Base padding + line height
+    }
 
     if(role == Qt::UserRole)
         return QVariant::fromValue(const_cast<ConfigNode *>(node));
 
-    if(!node->comment.empty()) {
-        if(role == Qt::UserRole + 1)
-            return QString::fromStdString(node->comment);
-        if(role == Qt::ForegroundRole && col == 0)
-            return QColor("#2196F3");
-        if(role == Qt::FontRole && col == 0) {
-            QFont f;
-            f.setItalic(true);
-            return f;
-        }
-    }
-
-    if(node->is_container() && role == Qt::FontRole && col == 0) {
-        QFont f;
-        f.setBold(true);
-        return f;
-    }
+    if(role == CommentRole && !node->comment.empty())
+        return QString::fromStdString(node->comment);
 
     return {};
 }

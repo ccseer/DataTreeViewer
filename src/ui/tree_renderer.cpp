@@ -3,8 +3,10 @@
 #include <QFont>
 #include <QHeaderView>
 #include <QShowEvent>
+#include <QPainter>
 
 #include "core/config_node.h"
+#include "tree_delegate.h"
 #include "tree_filter_proxy.h"
 #include "tree_model.h"
 
@@ -12,7 +14,8 @@
 
 TreeRenderer::TreeRenderer(QWidget *parent) : QTreeView(parent)
 {
-    setUniformRowHeights(true);
+    setUniformRowHeights(false);
+    setWordWrap(true);
     setAnimated(true);
     setExpandsOnDoubleClick(false);
     setIconSize(QSize(18, 18));
@@ -22,6 +25,11 @@ TreeRenderer::TreeRenderer(QWidget *parent) : QTreeView(parent)
     m_proxy = new TreeFilterProxyModel(this);
     m_proxy->setSourceModel(m_model);
     QTreeView::setModel(m_proxy);
+    setItemDelegate(new TreeDelegate(this));
+
+    setRootIsDecorated(true);
+    header()->setStretchLastSection(true);
+    header()->setMinimumSectionSize(100);
 
     connect(selectionModel(), &QItemSelectionModel::currentChanged, this,
             [this](const QModelIndex &current, const QModelIndex &) {
@@ -40,12 +48,43 @@ void TreeRenderer::showEvent(QShowEvent *event)
     int w = width();
     if(w > 0)
         header()->resizeSection(0, w / 3);
+    setIndentation(20);
+}
+
+void TreeRenderer::drawBranches(QPainter *painter, const QRect &rect,
+                                const QModelIndex &index) const
+{
+    QTreeView::drawBranches(painter, rect, index);
+
+    painter->save();
+    painter->setRenderHint(QPainter::Antialiasing, false);
+
+    QColor lineColor = palette().color(QPalette::Text);
+    lineColor.setAlpha(40); // Very subtle
+    painter->setPen(QPen(lineColor, 1.0, Qt::DotLine));
+
+    int indent = indentation();
+    if(indent > 0) {
+        int depth = 0;
+        QModelIndex temp = index.parent();
+        while(temp.isValid()) {
+            depth++;
+            temp = temp.parent();
+        }
+
+        for(int i = 0; i < depth; ++i) {
+            int x = rect.left() + (i * indent) + indent / 2;
+            painter->drawLine(x, rect.top(), x, rect.bottom());
+        }
+    }
+
+    painter->restore();
 }
 
 void TreeRenderer::clear()
 {
     m_truncatedCount = 0;
-    m_model->render(ConfigNode{});
+    m_model->clear();
 }
 
 void TreeRenderer::render(const ConfigNode &root)
@@ -68,8 +107,7 @@ void TreeRenderer::setExpandAll(bool on)
 
 void TreeRenderer::setDarkMode(bool on)
 {
-    // Dark mode is handled via palette by the parent DataTreeViewer
-    Q_UNUSED(on);
+    m_model->setDarkMode(on);
 }
 
 void TreeRenderer::applyFilter(const QString &text)

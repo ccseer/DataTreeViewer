@@ -3,6 +3,7 @@
 #include <toml++/toml.hpp>
 
 #include "core/parser_registry.h"
+#include "core/parser_helpers.h"
 
 namespace {
 
@@ -89,13 +90,20 @@ ParseResult TomlParser::parse(std::string_view data)
     try {
         auto tbl = toml::parse(data);
         result.root = walk(tbl);
+
+        auto commentMap = dtv::core::extractComments(data);
+        dtv::core::applyComments(result.root, commentMap);
+
         result.ok   = true;
     } catch (const toml::parse_error& e) {
-        result.ok       = false;
-        result.error    = e.what();
-        result.err_line = static_cast<int>(e.source().begin.line);
+        result.root = dtv::core::createErrorNode(e.description(), static_cast<int>(e.source().begin.line));
+        result.ok   = true;
+        result.has_parse_error = true;
+        result.error = e.description();
     } catch (const std::exception& e) {
-        result.ok    = false;
+        result.root = dtv::core::createErrorNode(e.what());
+        result.ok    = true;
+        result.has_parse_error = true;
         result.error = e.what();
     }
 #else
@@ -104,9 +112,10 @@ ParseResult TomlParser::parse(std::string_view data)
         result.root = walk(parseRes.table());
         result.ok   = true;
     } else {
-        result.ok       = false;
-        result.error    = std::string(parseRes.error().description());
-        result.err_line = static_cast<int>(parseRes.error().source().begin.line);
+        result.root = dtv::core::createErrorNode(std::string(parseRes.error().description()), static_cast<int>(parseRes.error().source().begin.line));
+        result.ok   = true;
+        result.has_parse_error = true;
+        result.error = std::string(parseRes.error().description());
     }
 #endif
 

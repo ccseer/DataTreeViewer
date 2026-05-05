@@ -52,16 +52,13 @@ bool TreeFilterProxyModel::hasAcceptedChild(int row, const QModelIndex &parent) 
 
 int TreeFilterProxyModel::matchCount() const
 {
+    rebuildMatchCache();
     return static_cast<int>(m_matchCache.size());
 }
 
 void TreeFilterProxyModel::selectNextMatch(QAbstractItemView *view)
 {
-    if(m_cacheDirty) {
-        m_matchCache.clear();
-        collectMatches(QModelIndex());
-        m_cacheDirty = false;
-    }
+    rebuildMatchCache();
 
     if(m_matchCache.isEmpty())
         return;
@@ -74,11 +71,7 @@ void TreeFilterProxyModel::selectNextMatch(QAbstractItemView *view)
 
 void TreeFilterProxyModel::selectPreviousMatch(QAbstractItemView *view)
 {
-    if(m_cacheDirty) {
-        m_matchCache.clear();
-        collectMatches(QModelIndex());
-        m_cacheDirty = false;
-    }
+    rebuildMatchCache();
 
     if(m_matchCache.isEmpty())
         return;
@@ -90,14 +83,36 @@ void TreeFilterProxyModel::selectPreviousMatch(QAbstractItemView *view)
     view->setCurrentIndex(proxyIdx);
 }
 
-void TreeFilterProxyModel::collectMatches(const QModelIndex &parent)
+bool TreeFilterProxyModel::indexMatches(const QModelIndex &index) const
+{
+    if(m_searchText.isEmpty() || !index.isValid())
+        return false;
+
+    const QModelIndex keyIdx = index.sibling(index.row(), 0);
+    const QModelIndex valIdx = index.sibling(index.row(), 1);
+    return keyIdx.data(Qt::DisplayRole).toString().contains(m_searchText, Qt::CaseInsensitive) ||
+           valIdx.data(Qt::DisplayRole).toString().contains(m_searchText, Qt::CaseInsensitive);
+}
+
+void TreeFilterProxyModel::collectMatches(const QModelIndex &parent) const
 {
     int rows = rowCount(parent);
     for(int i = 0; i < rows; ++i) {
         QModelIndex idx = index(i, 0, parent);
         if(idx.isValid()) {
-            m_matchCache.append(idx);
+            if(indexMatches(idx))
+                m_matchCache.append(idx);
             collectMatches(idx);
         }
     }
+}
+
+void TreeFilterProxyModel::rebuildMatchCache() const
+{
+    if(!m_cacheDirty)
+        return;
+
+    m_matchCache.clear();
+    collectMatches(QModelIndex());
+    m_cacheDirty = false;
 }

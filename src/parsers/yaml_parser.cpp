@@ -3,6 +3,7 @@
 #include <ryml.hpp>
 
 #include "core/parser_registry.h"
+#include "core/parser_helpers.h"
 
 namespace {
 
@@ -11,20 +12,17 @@ ConfigNode::Type deduceScalarType(c4::csubstr val)
     if (val.empty())
         return ConfigNode::Type::String;
 
-    // Null
     if (val == "null" || val == "~" || val == "NULL" || val == "Null")
         return ConfigNode::Type::Null;
 
-    // Bool — YAML 1.2: only true/false (yes/no/on/off removed in 1.2)
     if (val == "true" || val == "True" || val == "TRUE" ||
         val == "false" || val == "False" || val == "FALSE")
         return ConfigNode::Type::Bool;
 
-    // Integer: optional sign then all digits
     {
         const char* p = val.data();
         const char* end = p + val.size();
-        if (*p == '-' || *p == '+') p++;
+        if (p < end && (*p == '-' || *p == '+')) p++;
         if (p < end) {
             bool allDigits = true;
             for (; p < end; ++p) {
@@ -34,7 +32,6 @@ ConfigNode::Type deduceScalarType(c4::csubstr val)
         }
     }
 
-    // Float: contains '.' with digit context, or scientific notation (e/E preceded by digit)
     {
         bool hasDot = false;
         auto dotPos = val.find('.');
@@ -60,7 +57,17 @@ ConfigNode::Type deduceScalarType(c4::csubstr val)
     return ConfigNode::Type::String;
 }
 
-void walk(ryml::ConstNodeRef node, ConfigNode& out)
+int resolveLine(const char* ptr, const char* bufferStart)
+{
+    if (!ptr || !bufferStart || ptr < bufferStart) return -1;
+    int line = 1;
+    for (const char* p = bufferStart; p < ptr; ++p) {
+        if (*p == '\n') line++;
+    }
+    return line;
+}
+
+void walk(ryml::ConstNodeRef node, const char* bufferStart, ConfigNode& out)
 {
     if (node.is_map()) {
         out.type = ConfigNode::Type::Object;
@@ -69,25 +76,32 @@ void walk(ryml::ConstNodeRef node, ConfigNode& out)
             if (child.has_key()) {
                 auto k = child.key();
                 childNode.key = std::string(k.data(), k.size());
+                childNode.source_line = resolveLine(k.data(), bufferStart);
             }
-            walk(child, childNode);
+            walk(child, bufferStart, childNode);
             out.children.push_back(std::move(childNode));
         }
     } else if (node.is_seq()) {
         out.type = ConfigNode::Type::Array;
         for (auto child : node.children()) {
             ConfigNode childNode;
-            walk(child, childNode);
+            walk(child, bufferStart, childNode);
+            // For seq members, if it's a scalar, try to get line
+            if (child.has_val()) {
+                childNode.source_line = resolveLine(child.val().data(), bufferStart);
+            }
             out.children.push_back(std::move(childNode));
         }
     } else if (node.has_val()) {
         auto v = node.val();
         out.type = deduceScalarType(v);
         out.scalar = std::string(v.data(), v.size());
+        if (out.source_line <= 0) {
+            out.source_line = resolveLine(v.data(), bufferStart);
+        }
     } else {
         out.type = ConfigNode::Type::Null;
     }
-    // Note: rapidyaml v0.7.2 does not expose comments
 }
 
 } // namespace
@@ -106,12 +120,17 @@ ParseResult YamlParser::parse(std::string_view data)
             return result;
         }
 
-        walk(tree.rootref(), result.root);
+        walk(tree.rootref(), data.data(), result.root);
+
+        auto commentMap = dtv::core::extractComments(data);
+        dtv::core::applyComments(result.root, commentMap);
+
         result.ok = true;
     } catch (const std::exception& e) {
-        result.ok       = false;
-        result.error    = e.what();
-        result.err_line = -1;  // ryml exception message includes line info in text
+        result.root = dtv::core::createErrorNode(e.what());
+        result.ok   = true;
+        result.has_parse_error = true;
+        result.error = e.what();
     }
 
     return result;

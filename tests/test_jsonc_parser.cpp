@@ -32,7 +32,9 @@ private slots:
     void test_empty()
     {
         auto result = m_parser.parse("");
-        QVERIFY(!result.ok);
+        QVERIFY(result.ok);
+        QVERIFY(result.has_parse_error);
+        QCOMPARE(result.root.key, std::string("PARSE ERROR"));
     }
 
     void test_parseValid_data()
@@ -63,8 +65,10 @@ private slots:
     {
         QFETCH(QString, input);
         auto result = m_parser.parse(input.toStdString());
-        QVERIFY(!result.ok);
+        QVERIFY(result.ok);
+        QVERIFY(result.has_parse_error);
         QVERIFY(!result.error.empty());
+        QCOMPARE(result.root.key, std::string("PARSE ERROR"));
     }
 
     void test_nestedContainers()
@@ -156,13 +160,15 @@ private slots:
     void test_trailingComment()
     {
         const auto *data = R"({
-            "key": "value" // trailing comment
+            "key": "value", // trailing comment
+            "next": 1
         })";
         auto result = m_parser.parse(data);
         QVERIFY(result.ok);
-        QCOMPARE(result.root.children.size(), size_t(1));
+        QCOMPARE(result.root.children.size(), size_t(2));
         QCOMPARE(QString::fromStdString(result.root.children[0].comment),
                  QString("trailing comment"));
+        QVERIFY(result.root.children[1].comment.empty());
     }
 
     void test_standaloneComment()
@@ -201,8 +207,10 @@ private slots:
     void test_brokenFile()
     {
         auto result = m_parser.parse(readFixture("broken.jsonc"));
-        QVERIFY(!result.ok);
+        QVERIFY(result.ok);
+        QVERIFY(result.has_parse_error);
         QVERIFY(!result.error.empty());
+        QCOMPARE(result.root.key, std::string("PARSE ERROR"));
     }
 };
 

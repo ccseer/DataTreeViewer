@@ -3,6 +3,7 @@
 #include <QApplication>
 #include <QFileInfo>
 #include <QLabel>
+#include <QLayout>
 #include <QPalette>
 #include <QPointer>
 #include <QPushButton>
@@ -19,6 +20,32 @@
 #include "workers/parse_worker.h"
 
 #define qprintt qDebug() << "[DataTreeViewer]"
+
+namespace {
+
+QString statusValueForNode(const ConfigNode &node)
+{
+    QString value;
+    if(node.is_container()) {
+        const int childCount = static_cast<int>(node.children.size());
+        if(node.type == ConfigNode::Type::Array)
+            value = QString("[%1 items]").arg(childCount);
+        else
+            value = QString("{%1 keys}").arg(childCount);
+    } else {
+        value = QString::fromStdString(node.scalar);
+        value.replace('\n', QStringLiteral("\\n"));
+        value.remove('\r');
+    }
+
+    constexpr int kMaxStatusChars = 80;
+    if(value.size() > kMaxStatusChars)
+        value = value.left(kMaxStatusChars) + "...";
+
+    return value.isEmpty() ? QString() : QString(" =  %1").arg(value);
+}
+
+} // namespace
 
 DataTreeViewer::DataTreeViewer(QWidget *parent) : ViewerBase(parent)
 {
@@ -69,14 +96,16 @@ void DataTreeViewer::loadImpl(QBoxLayout *lay_content, QHBoxLayout *lay_ctrlbar)
     // Control bar: text view button (same as JsonTreeViewer)
     if(lay_ctrlbar) {
         lay_ctrlbar->addStretch();
-        m_btn_text_view = new QPushButton(this);
-        m_btn_text_view->setObjectName("textViewBtn");
-        m_btn_text_view->setFlat(true);
-        m_btn_text_view->setToolTip("Text View");
-        m_btn_text_view->setFocusPolicy(Qt::NoFocus);
+        if(!m_btn_text_view) {
+            m_btn_text_view = new QPushButton(this);
+            m_btn_text_view->setObjectName("textViewBtn");
+            m_btn_text_view->setFlat(true);
+            m_btn_text_view->setToolTip("Text View");
+            m_btn_text_view->setFocusPolicy(Qt::NoFocus);
+            connect(m_btn_text_view, &QPushButton::clicked, this,
+                    &DataTreeViewer::onTextViewBtnClicked);
+        }
         lay_ctrlbar->addWidget(m_btn_text_view);
-        connect(m_btn_text_view, &QPushButton::clicked, this,
-                &DataTreeViewer::onTextViewBtnClicked);
     }
 
     updateDPR(options()->dpr());
@@ -150,6 +179,14 @@ void DataTreeViewer::showLoadingState()
 
 void DataTreeViewer::onParseCompleted(std::shared_ptr<const ParseResult> result, qint64 elapsedMs)
 {
+    qprintt << "parseCompleted"
+            << "ok" << result->ok
+            << "parseError" << result->has_parse_error
+            << "elapsed" << elapsedMs
+            << "errorLine" << result->err_line
+            << "errorBytes" << result->error.size()
+            << "rootChildren" << result->root.children.size();
+
     m_errorLabel->hide();
 
     if(!result->ok) {
@@ -161,11 +198,17 @@ void DataTreeViewer::onParseCompleted(std::shared_ptr<const ParseResult> result,
     m_lastResult = std::move(result);
     m_renderer->setExpandAll(m_lastResult->file_bytes < 5 * 1024 * 1024);
     m_renderer->render(m_lastResult->root);
+    if(m_lastResult->has_parse_error)
+        m_renderer->expandAll();
     m_breadcrumb->clear();
 
     m_status->setLoadInfo(m_lastResult->total_nodes, m_lastResult->file_bytes, elapsedMs,
                           QString::fromStdString(m_lastResult->format_name),
                           QString::fromStdString(m_lastResult->library_credit));
+
+    if(m_lastResult->has_parse_error)
+        m_status->setValueText(QString("JSONC Parse Error: %1")
+                                   .arg(QString::fromStdString(m_lastResult->error)));
 
     emit sigCommand(VCT_StateChange, VCV_Loaded);
     qprintt << "loaded" << m_lastResult->total_nodes << "nodes" << elapsedMs << "ms";
@@ -173,6 +216,12 @@ void DataTreeViewer::onParseCompleted(std::shared_ptr<const ParseResult> result,
 
 void DataTreeViewer::onNodeActivated(const ConfigNode *node)
 {
+    if(node) {
+        m_status->setValueText(statusValueForNode(*node));
+    } else {
+        m_status->setValueText({});
+    }
+
     if(node && node->source_line >= 0)
         m_status->setSourceLine(node->source_line);
     else
@@ -217,7 +266,7 @@ void DataTreeViewer::onFilterChanged(const QString &text)
     if(!text.isEmpty() && m_renderer->matchCount() == 0)
         m_status->showFilterNoHits(text);
     else
-        m_status->clear();
+        m_status->restoreInfo();
 }
 
 void DataTreeViewer::onTextViewBtnClicked()
@@ -261,6 +310,8 @@ void DataTreeViewer::reapplyStyles()
     auto font = qApp->font();
     font.setPixelSize(qRound(12 * r));
     setFont(font);
+    if(layout())
+        layout()->setSpacing(qRound(6 * r));
 
     QPalette p = palette();
     p.setColor(QPalette::Window, QColor(m_isDarkMode ? Colors::DarkBG : Colors::LightBG));
@@ -270,18 +321,46 @@ void DataTreeViewer::reapplyStyles()
     p.setColor(QPalette::PlaceholderText,
                QColor(m_isDarkMode ? Colors::DarkTextDim : Colors::LightTextDim));
     setPalette(p);
-    m_renderer->setPalette(p);
-    m_renderer->setDarkMode(m_isDarkMode);
+    if(m_renderer) {
+        m_renderer->setPalette(p);
+        m_renderer->setDarkMode(m_isDarkMode);
+    }
+
+    if(m_search) {
+        m_search->setFont(font);
+        m_search->setFixedHeight(qRound(42 * r));
+        const QString borderColor = m_isDarkMode ? Colors::DarkBorder : Colors::LightBorder;
+        const QString inputColor = m_isDarkMode ? Colors::DarkInput : Colors::LightInput;
+        const QString textColor = m_isDarkMode ? Colors::DarkText : Colors::LightText;
+        m_search->setStyleSheet(QString(g_qss_top_bar)
+                                    .arg("transparent")
+                                    .arg(borderColor)
+                                    .arg(inputColor)
+                                    .arg(textColor)
+                                    .arg(Colors::Accent)
+                                    .arg(qRound(4 * r))
+                                    .arg(qRound(4 * r))
+                                    .arg(qRound(10 * r)));
+    }
+
+    if(!m_status)
+        return;
 
     m_status->updateTheme(m_isDarkMode, r);
+
+    // Apply QSS to bottom bar
+    QString surfaceColor = m_isDarkMode ? Colors::DarkSurface : Colors::LightSurface;
+    QString borderColor = m_isDarkMode ? Colors::DarkBorder : Colors::LightBorder;
+    m_status->setStyleSheet(QString(g_qss_bottom_bar).arg(surfaceColor, borderColor));
 
     if(m_btn_text_view) {
         constexpr int ctrlbar_btn_sz = 30;
         constexpr int ctrlbar_btn_icon_sz = 24;
-        QColor textColor(m_isDarkMode ? Colors::DarkText : Colors::LightText);
+        QColor accentColor(Colors::Accent);
         m_btn_text_view->setFixedSize(qRound(ctrlbar_btn_sz * r), qRound(ctrlbar_btn_sz * r));
         m_btn_text_view->setIconSize(
             QSize(qRound(ctrlbar_btn_icon_sz * r), qRound(ctrlbar_btn_icon_sz * r)));
-        m_btn_text_view->setIcon(svgIcon(g_svg_article, textColor, ctrlbar_btn_icon_sz));
+        m_btn_text_view->setIcon(
+            dtv::ui::createMultiStateIcon(g_svg_article, accentColor, ctrlbar_btn_icon_sz));
     }
 }

@@ -5,6 +5,9 @@
 #include <QScopeGuard>
 #include <QThread>
 
+#include <exception>
+#include <string_view>
+
 #include "core/iformat_parser.h"
 
 #define qprintt qDebug() << "[ParseWorker]"
@@ -78,12 +81,34 @@ void ParseWorker::doParse()
     }
 
     // 4. Parse
-    qprintt << "parsing with" << fmtName.c_str();
-    auto result = std::make_shared<ParseResult>(
-        m_parser->parse(std::string_view(raw.constData(), size_t(raw.size()))));
+    qprintt << "parsing with" << fmtName.c_str() << "payload bytes" << raw.size();
+    auto result = std::make_shared<ParseResult>();
+    try {
+        qprintt << "calling parser->parse";
+        *result = m_parser->parse(std::string_view(raw.constData(), size_t(raw.size())));
+        qprintt << "parser->parse returned"
+                << "ok" << result->ok
+                << "parseError" << result->has_parse_error
+                << "error bytes" << result->error.size()
+                << "children" << result->root.children.size();
+    } catch(const std::exception &e) {
+        qprintt << "parser threw std::exception:" << e.what();
+        result->ok = false;
+        result->error = e.what();
+    } catch(...) {
+        qprintt << "parser threw unknown exception";
+        result->ok = false;
+        result->error = "Parser threw an unknown exception";
+    }
 
     if(!result->ok) {
-        qprintt << "parse failed:" << result->error.c_str();
+        qprintt << "parse failed:"
+                << "line" << result->err_line
+                << "message" << result->error.c_str();
+    } else if(result->has_parse_error) {
+        qprintt << "parse produced error tree:"
+                << "line" << result->err_line
+                << "message" << result->error.c_str();
     }
 
     if(thread->isInterruptionRequested()) {

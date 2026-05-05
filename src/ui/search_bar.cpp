@@ -3,17 +3,22 @@
 #include <QHBoxLayout>
 #include <QKeyEvent>
 #include <QLineEdit>
+#include <QSizePolicy>
 #include <QTimer>
 
 #define qprintt qDebug() << "[SearchBar]"
 
 SearchBar::SearchBar(QWidget *parent) : QWidget(parent)
 {
+    setObjectName("topBar");
+    setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+
     auto *layout = new QHBoxLayout(this);
-    layout->setContentsMargins(4, 2, 4, 2);
+    layout->setContentsMargins(12, 6, 12, 6);
+    layout->setSpacing(10);
 
     m_edit = new QLineEdit(this);
-    m_edit->setPlaceholderText("Search...");
+    m_edit->setPlaceholderText("Filter current view...");
     m_edit->setClearButtonEnabled(true);
     layout->addWidget(m_edit);
 

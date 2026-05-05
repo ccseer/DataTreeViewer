@@ -72,6 +72,7 @@ set(CORE_SOURCES
     src/core/iformat_parser.h
     src/core/parser_registry.h
     src/core/parser_registry.cpp
+    src/core/parser_helpers.cpp
 )
 
 set(PARSER_SOURCES
@@ -99,6 +100,8 @@ set(UI_SOURCES
     src/ui/status_bar.h
     src/ui/status_bar.cpp
     src/ui/style_assets.h
+    src/ui/tree_delegate.h
+    src/ui/tree_delegate.cpp
     src/ui/tree_filter_proxy.h
     src/ui/tree_filter_proxy.cpp
     src/ui/tree_model.h

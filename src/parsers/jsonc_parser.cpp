@@ -2,20 +2,92 @@
 
 #include <nlohmann/json.hpp>
 
+#include <algorithm>
+#include <cctype>
+#include <iostream>
 #include <queue>
 #include <regex>
 #include <string_view>
 
 #include "core/parser_registry.h"
+#include "core/parser_helpers.h"
+
+#ifdef _WIN32
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#endif
 
 namespace {
 
-// ---- Comment extraction ----
+void traceJsonc(const std::string &message)
+{
+    const std::string line = "[JsoncParser] " + message;
+#ifdef _WIN32
+    OutputDebugStringA((line + "\n").c_str());
+#endif
+    std::clog << line << std::endl;
+}
 
 struct CommentEntry {
     std::string key;
     std::string comment;
 };
+
+void trim(std::string &s) {
+    auto it1 = std::find_if(s.begin(), s.end(), [](unsigned char ch) { return !std::isspace(ch); });
+    s.erase(s.begin(), it1);
+    auto it2 = std::find_if(s.rbegin(), s.rend(), [](unsigned char ch) { return !std::isspace(ch); });
+    s.erase(it2.base(), s.end());
+}
+
+int estimateErrorLine(std::string_view data)
+{
+    int line = 1;
+    bool inString = false;
+    bool escaped = false;
+    char previousSignificant = 0;
+
+    for(char c : data) {
+        if(c == '\n') {
+            ++line;
+            continue;
+        }
+
+        if(inString) {
+            if(escaped) {
+                escaped = false;
+            } else if(c == '\\') {
+                escaped = true;
+            } else if(c == '"') {
+                inString = false;
+            }
+            continue;
+        }
+
+        if(c == '"') {
+            inString = true;
+            previousSignificant = 'x';
+            continue;
+        }
+
+        if(std::isspace(static_cast<unsigned char>(c)))
+            continue;
+
+        if((c == ',' && previousSignificant == ',') ||
+           ((c == '}' || c == ']') && previousSignificant == ',')) {
+            return line;
+        }
+
+        previousSignificant = c;
+    }
+
+    return line;
+}
 
 std::string stripComments(const std::string_view &data, std::queue<CommentEntry> &outComments)
 {
@@ -23,207 +95,210 @@ std::string stripComments(const std::string_view &data, std::queue<CommentEntry>
     clean.reserve(data.size());
 
     std::string pending_comment;
+    bool in_str = false;
+    bool in_block = false;
+    bool in_line = false;
 
-    std::string_view remaining = data;
+    std::string current_comment;
 
-    while(!remaining.empty()) {
-        size_t nl_pos = remaining.find('\n');
-        std::string_view line =
-            (nl_pos != std::string_view::npos) ? remaining.substr(0, nl_pos + 1) : remaining;
+    for (size_t i = 0; i < data.size(); ++i) {
+        char c = data[i];
+        char next = (i + 1 < data.size()) ? data[i+1] : 0;
 
-        bool has_comment = false;
-        size_t comment_start = std::string_view::npos;
-
-        // Find trailing // comment (skip strings)
-        bool in_str = false;
-        for(size_t i = 0; i < line.size(); ++i) {
-            if(line[i] == '"' && (i == 0 || line[i - 1] != '\\'))
-                in_str = !in_str;
-            if(!in_str && line[i] == '/' && i + 1 < line.size() && line[i + 1] == '/') {
-                comment_start = i;
-                has_comment = true;
-                break;
-            }
-        }
-
-        if(has_comment) {
-            clean.append(line.data(), comment_start);
-
-            // Extract and trim comment text
-            std::string comment_text(line.substr(comment_start + 2));
-            while(!comment_text.empty() &&
-                  (comment_text.back() == '\n' || comment_text.back() == '\r' ||
-                   comment_text.back() == ' ' || comment_text.back() == '\t'))
-                comment_text.pop_back();
-            size_t lead = 0;
-            while(lead < comment_text.size() &&
-                  (comment_text[lead] == ' ' || comment_text[lead] == '\t'))
-                ++lead;
-            if(lead > 0)
-                comment_text.erase(0, lead);
-
-            // Find the last key on this line
-            std::string before_comment{line.substr(0, comment_start)};
-            std::regex key_re(R"re("([^"]+)"\s*:)re");
-            std::smatch m;
-            std::string last_key;
-            auto it = before_comment.cbegin();
-            while(std::regex_search(it, before_comment.cend(), m, key_re)) {
-                last_key = m[1].str();
-                it = m.suffix().first;
-            }
-
-            if(!last_key.empty()) {
-                // Trailing comment on a key-value line
-                outComments.push({last_key, comment_text});
+        if (in_block) {
+            if (c == '*' && next == '/') {
+                in_block = false;
+                i++;
+                clean.append("  ");
+                trim(current_comment);
+                if (!current_comment.empty()) pending_comment = current_comment;
+                current_comment.clear();
             } else {
-                // Standalone comment — save as pending for the NEXT key
-                pending_comment = comment_text;
-            }
-
-            // Replace comment with spaces
-            for(size_t i = comment_start; i < line.size(); ++i) {
-                if(line[i] == '\n' || line[i] == '\r')
-                    clean.push_back(line[i]);
-                else
-                    clean.push_back(' ');
-            }
-        } else {
-            // No // comment on this line — check if there's a key to consume pending comment
-            std::string line_copy{line.begin(), line.end()};
-            std::regex key_re(R"re("([^"]+)"\s*:)re");
-            std::smatch m;
-            std::string last_key;
-            auto it = line_copy.cbegin();
-            while(std::regex_search(it, line_copy.cend(), m, key_re)) {
-                last_key = m[1].str();
-                it = m.suffix().first;
-            }
-
-            if(!last_key.empty() && !pending_comment.empty()) {
-                outComments.push({last_key, pending_comment});
-                pending_comment.clear();
-            }
-
-            clean.append(line.data(), line.size());
-        }
-
-        if(nl_pos == std::string_view::npos)
-            break;
-        remaining = remaining.substr(nl_pos + 1);
-    }
-
-    // Strip block comments /* ... */ (replace with spaces)
-    std::string result;
-    result.reserve(clean.size());
-    bool in_str2 = false;
-    for(size_t i = 0; i < clean.size();) {
-        if(!in_str2 && clean[i] == '/' && i + 1 < clean.size() && clean[i + 1] == '*') {
-            size_t j = i + 2;
-            while(j < clean.size() &&
-                  !(clean[j] == '*' && j + 1 < clean.size() && clean[j + 1] == '/'))
-                ++j;
-            if(j < clean.size())
-                j += 2;
-            while(i < j) {
-                result.push_back(clean[i] == '\n' ? '\n' : ' ');
-                ++i;
+                if (c == '\n') clean.push_back('\n');
+                else clean.push_back(' ');
+                current_comment.push_back(c);
             }
             continue;
         }
-        if(clean[i] == '"') {
-            bool escaped = (i > 0 && clean[i - 1] == '\\');
-            if(!escaped)
-                in_str2 = !in_str2;
+
+        if (in_line) {
+            if (c == '\n') {
+                in_line = false;
+                clean.push_back('\n');
+                trim(current_comment);
+                if (!current_comment.empty()) pending_comment = current_comment;
+                current_comment.clear();
+            } else {
+                clean.push_back(' ');
+                current_comment.push_back(c);
+            }
+            continue;
         }
-        result.push_back(clean[i]);
-        ++i;
+
+        if (in_str) {
+            if (c == '"') {
+                bool escaped = false;
+                size_t k = i;
+                while (k > 0 && data[k-1] == '\\') {
+                    escaped = !escaped;
+                    k--;
+                }
+                if (!escaped) in_str = false;
+            }
+            clean.push_back(c);
+            continue;
+        }
+
+        if (c == '"') {
+            in_str = true;
+            clean.push_back(c);
+
+            if (!pending_comment.empty()) {
+                size_t line_start = clean.rfind('\n');
+                if (line_start == std::string::npos) line_start = 0;
+                else line_start++;
+
+                if (line_start < clean.size()) {
+                    std::string current_line = clean.substr(line_start);
+                    std::regex key_re(R"re("([^"]+)"\s*:)re");
+                    std::smatch m;
+                    if (std::regex_search(current_line, m, key_re)) {
+                        outComments.push({m[1].str(), pending_comment});
+                        pending_comment.clear();
+                    }
+                }
+            }
+            continue;
+        }
+
+        if (c == '/' && next == '/') {
+            in_line = true;
+            i++;
+            clean.append("  ");
+            continue;
+        }
+
+        if (c == '/' && next == '*') {
+            in_block = true;
+            i++;
+            clean.append("  ");
+            continue;
+        }
+
+        if (c == '#') {
+            in_line = true;
+            clean.push_back(' ');
+            continue;
+        }
+
+        clean.push_back(c);
     }
 
-    return result;
+    return clean;
 }
 
 ConfigNode walkJ(const nlohmann::json &j)
 {
     ConfigNode node;
-
-    switch(j.type()) {
-    case nlohmann::json::value_t::object:
-        node.type = ConfigNode::Type::Object;
-        node.children.reserve(j.size());
-        for(auto it = j.begin(); it != j.end(); ++it) {
-            ConfigNode child = walkJ(it.value());
-            child.key = it.key();
-            node.children.push_back(std::move(child));
+    try {
+        if (j.is_object()) {
+            node.type = ConfigNode::Type::Object;
+            for (auto it = j.begin(); it != j.end(); ++it) {
+                ConfigNode child = walkJ(it.value());
+                child.key = it.key();
+                node.children.push_back(std::move(child));
+            }
+        } else if (j.is_array()) {
+            node.type = ConfigNode::Type::Array;
+            for (const auto &elem : j) {
+                node.children.push_back(walkJ(elem));
+            }
+        } else if (j.is_string()) {
+            node.type = ConfigNode::Type::String;
+            node.scalar = j.get<std::string>();
+        } else if (j.is_number_integer() || j.is_number_unsigned()) {
+            node.type = ConfigNode::Type::Integer;
+            node.scalar = j.dump();
+        } else if (j.is_number_float()) {
+            node.type = ConfigNode::Type::Float;
+            node.scalar = j.dump();
+        } else if (j.is_boolean()) {
+            node.type = ConfigNode::Type::Bool;
+            node.scalar = j.get<bool>() ? "true" : "false";
+        } else if (j.is_null()) {
+            node.type = ConfigNode::Type::Null;
+            node.scalar = "null";
+        } else {
+            node.type = ConfigNode::Type::Null;
         }
-        break;
-
-    case nlohmann::json::value_t::array:
-        node.type = ConfigNode::Type::Array;
-        node.children.reserve(j.size());
-        for(const auto &elem : j)
-            node.children.push_back(walkJ(elem));
-        break;
-
-    case nlohmann::json::value_t::string:
-        node.type = ConfigNode::Type::String;
-        node.scalar = j.get<std::string>();
-        break;
-
-    case nlohmann::json::value_t::number_integer:
-    case nlohmann::json::value_t::number_unsigned:
-        node.type = ConfigNode::Type::Integer;
-        node.scalar = j.dump();
-        break;
-
-    case nlohmann::json::value_t::number_float:
-        node.type = ConfigNode::Type::Float;
-        node.scalar = j.dump();
-        break;
-
-    case nlohmann::json::value_t::boolean:
-        node.type = ConfigNode::Type::Bool;
-        node.scalar = j.get<bool>() ? "true" : "false";
-        break;
-
-    case nlohmann::json::value_t::null:
+    } catch (...) {
         node.type = ConfigNode::Type::Null;
-        node.scalar = "null";
-        break;
-
-    case nlohmann::json::value_t::discarded:
-    case nlohmann::json::value_t::binary:
-        node.type = ConfigNode::Type::Null;
-        break;
     }
-
     return node;
 }
 
-// ---- Annotate tree with comments ----
-
-void annotateComments(ConfigNode &root, std::queue<CommentEntry> &comments)
+void annotateComments(ConfigNode &node, std::queue<CommentEntry> &comments)
 {
-    std::vector<ConfigNode *> stack;
-    stack.push_back(&root);
-
-    while(!stack.empty()) {
-        ConfigNode *node = stack.back();
-        stack.pop_back();
-
-        for(auto &child : node->children) {
-            if(!child.key.empty() && !comments.empty()) {
-                if(comments.front().key == child.key) {
-                    child.comment = comments.front().comment;
-                    comments.pop();
-                }
+    if (comments.empty()) return;
+    for(auto &child : node.children) {
+        if(!child.key.empty() && !comments.empty()) {
+            if(comments.front().key == child.key) {
+                child.comment = comments.front().comment;
+                comments.pop();
             }
-            stack.push_back(&child);
         }
+        annotateComments(child, comments);
     }
 }
 
 } // namespace
+
+ParseResult JsoncParser::parse(std::string_view data)
+{
+    ParseResult result;
+    std::queue<CommentEntry> comments;
+
+    traceJsonc("parse enter, bytes=" + std::to_string(data.size()));
+
+    try {
+        std::string clean = stripComments(data, comments);
+        traceJsonc("comments stripped, clean bytes=" + std::to_string(clean.size()) +
+                   ", pending comments=" + std::to_string(comments.size()));
+
+        auto j = nlohmann::json::parse(clean, nullptr, false, true);
+        if(j.is_discarded()) {
+            result.err_line = estimateErrorLine(clean);
+            result.root = dtv::core::createErrorNode("Invalid JSONC syntax", result.err_line);
+            result.ok = true;
+            result.has_parse_error = true;
+            result.error = "Invalid JSONC syntax";
+            traceJsonc("parse failed without exception, estimated line=" +
+                       std::to_string(result.err_line));
+            return result;
+        }
+
+        traceJsonc("nlohmann parse ok, walking tree");
+        result.root = walkJ(j);
+        traceJsonc("walk complete, annotating comments");
+        annotateComments(result.root, comments);
+        result.ok = true;
+        traceJsonc("parse leave ok");
+    } catch(const std::exception &e) {
+        traceJsonc(std::string("std::exception: ") + e.what());
+        result.root = dtv::core::createErrorNode(e.what());
+        result.ok = true;
+        result.has_parse_error = true;
+        result.error = e.what();
+    } catch(...) {
+        traceJsonc("unknown exception");
+        result.root = dtv::core::createErrorNode("Unknown fatal error");
+        result.ok = true;
+        result.has_parse_error = true;
+        result.error = "Unknown fatal error";
+    }
+
+    return result;
+}
 
 std::string JsoncParser::library_credit() const
 {
@@ -232,39 +307,12 @@ std::string JsoncParser::library_credit() const
            std::to_string(NLOHMANN_JSON_VERSION_PATCH);
 }
 
-ParseResult JsoncParser::parse(std::string_view data)
-{
-    ParseResult result;
-    std::queue<CommentEntry> comments;
-
-    std::string clean = stripComments(data, comments);
-
-    try {
-        auto j = nlohmann::json::parse(clean, nullptr, true, true);
-        result.root = walkJ(j);
-        annotateComments(result.root, comments);
-        result.ok = true;
-    } catch(const nlohmann::json::parse_error &e) {
-        result.ok = false;
-        result.error = e.what();
-        result.err_line = static_cast<int>(e.byte);
-    }
-
-    return result;
-}
-
 void JsoncParser::registerSelf()
 {
     auto &reg = ParserRegistry::instance();
-    reg.registerParser("json", [] {
-        return std::make_unique<JsoncParser>();
-    });
-    reg.registerParser("jsonc", [] {
-        return std::make_unique<JsoncParser>();
-    });
-    reg.registerParser("json5", [] {
-        return std::make_unique<JsoncParser>();
-    });
+    reg.registerParser("json", [] { return std::make_unique<JsoncParser>(); });
+    reg.registerParser("jsonc", [] { return std::make_unique<JsoncParser>(); });
+    reg.registerParser("json5", [] { return std::make_unique<JsoncParser>(); });
 }
 
 REGISTER_PARSER("json", JsoncParser)

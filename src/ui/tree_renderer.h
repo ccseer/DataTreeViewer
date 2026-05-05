@@ -33,6 +33,7 @@ signals:
 
 protected:
     void showEvent(QShowEvent *event) override;
+    void drawBranches(QPainter *painter, const QRect &rect, const QModelIndex &index) const override;
 
 private:
     TreeModel *m_model = nullptr;

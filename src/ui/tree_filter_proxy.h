@@ -19,10 +19,12 @@ protected:
 
 private:
     bool hasAcceptedChild(int row, const QModelIndex &parent) const;
-    void collectMatches(const QModelIndex &parent);
+    bool indexMatches(const QModelIndex &index) const;
+    void collectMatches(const QModelIndex &parent) const;
+    void rebuildMatchCache() const;
 
     QString m_searchText;
-    int m_currentMatch = -1;
+    mutable int m_currentMatch = -1;
 
     mutable QList<QPersistentModelIndex> m_matchCache;
     mutable bool m_cacheDirty = true;

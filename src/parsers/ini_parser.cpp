@@ -6,6 +6,7 @@
 #include <sstream>
 
 #include "core/parser_registry.h"
+#include "core/parser_helpers.h"
 
 ParseResult IniParser::parse(std::string_view data)
 {
@@ -18,8 +19,10 @@ ParseResult IniParser::parse(std::string_view data)
 
     SI_Error rc = ini.LoadData(stream);
     if (rc < 0) {
-        result.ok    = false;
-        result.error = "Failed to parse INI data (SI_Error " + std::to_string(rc) + ")";
+        result.root = dtv::core::createErrorNode("Failed to parse INI data (SI_Error " + std::to_string(rc) + ")");
+        result.ok   = true;
+        result.has_parse_error = true;
+        result.error = result.root.children[0].scalar;
         return result;
     }
 
