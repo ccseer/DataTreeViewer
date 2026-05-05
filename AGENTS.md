@@ -31,7 +31,7 @@ Seer Plugin Host (QPluginLoader → ViewerPluginInterface)
     └── DataTreeViewer      ← ViewerBase subclass, thread management
         ├── ParseWorker     ← background QThread, I/O + parsing
         │   └── IFormatParser ← parser interface (core/)
-        ├── TreeRenderer    ← QTreeWidget, knows ConfigNode only
+        ├── TreeRenderer    ← QTreeView + TreeModel, knows ConfigNode only
         ├── BreadcrumbBar   ← ported from JsonTreeViewer
         ├── SearchBar       ← ported from JsonTreeViewer
         └── StatusBar       ← format stats, error, filter hits
@@ -61,8 +61,9 @@ DataTreeViewer/
 │   └── plugin.json            ← Seer plugin metadata (copied to build dir)
 └── src/
     ├── core/                  ← zero Qt, zero UI deps
-    │   ├── config_node.h      ← IR struct (Type enum, children vector)
-    │   ├── iformat_parser.h   ← IFormatParser pure virtual + ParseResult
+    │   ├── config_node.h          ← IR struct (Type enum, children vector)
+    │   ├── iformat_parser.h       ← IFormatParser pure virtual + ParseResult
+    │   ├── parser_helpers.h/.cpp  ← utilities (e.g. comment extraction)
     │   └── parser_registry.h/.cpp ← singleton, macro-based registration
     ├── parsers/               ← zero Qt
     │   ├── jsonc_parser.h/.cpp ← nlohmann/json
@@ -74,7 +75,10 @@ DataTreeViewer/
     │   └── parse_worker.h/.cpp ← QObject, moved to BackgroundThread
     ├── ui/
     │   ├── data_tree_viewer.h/.cpp ← ViewerBase subclass + DTPlugin
-    │   ├── tree_renderer.h/.cpp    ← QTreeWidget, knows ConfigNode only
+    │   ├── tree_renderer.h/.cpp    ← QTreeView wrapper, sets up model/delegate
+    │   ├── tree_model.h/.cpp       ← QAbstractItemModel for ConfigNode
+    │   ├── tree_delegate.h/.cpp    ← QStyledItemDelegate for custom drawing
+    │   ├── tree_filter_proxy.h/.cpp ← QSortFilterProxyModel for search
     │   ├── breadcrumb_bar.h/.cpp
     │   ├── search_bar.h/.cpp
     │   └── status_bar.h/.cpp
@@ -208,6 +212,7 @@ At each step, check `QThread::isInterruptionRequested()` for cooperative cancell
 10. Encoding (UTF-8 BOM strip)
 11. File size guard + metatype registration
 12. SeerSdk integration — ViewerBase, DTPlugin, plugin.json, sigCommand, theme/DPI
+13. QTreeView migration + comment extraction (JSONC, YAML, INI, TOML) + Error trees
 
 ---
 
@@ -216,7 +221,7 @@ At each step, check `QThread::isInterruptionRequested()` for cooperative cancell
 | Library | Version | Notes |
 |---------|---------|-------|
 | **SeerSdk** | main | ViewerBase, ViewerPluginInterface, ViewOptions |
-| nlohmann/json | 3.11.3 | strips comments (v1 limitation) |
-| toml++ | 3.4.0 | ISO 8601 datetimes → String; `TOML_EXCEPTIONS=0` |
-| SimpleIni | 4.22 | case-sensitive keys, duplicates not merged |
-| rapidyaml | 0.7.2 | FetchContent with c4core submodule, exceptions required |
+| nlohmann/json | 3.11.3 | comments extracted manually via core::extractComments |
+| toml++ | 3.4.0 | ISO 8601 datetimes → String; comments extracted manually; keys sorted by source_line |
+| SimpleIni | 4.22 | case-sensitive keys; comments extracted manually |
+| rapidyaml | 0.7.2 | FetchContent with c4core submodule, exceptions required; comments extracted manually |
