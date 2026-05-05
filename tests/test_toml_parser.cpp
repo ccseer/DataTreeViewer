@@ -1,6 +1,10 @@
 #include <QFile>
 #include <QTest>
 
+#include <functional>
+#include <unordered_map>
+#include <vector>
+
 #include "parsers/toml_parser.h"
 
 class TestTomlParser : public QObject {
@@ -22,6 +26,15 @@ private:
         QVERIFY(!result.root.children.empty());
         QCOMPARE(result.root.children.front().key, std::string("PARSE ERROR"));
         QVERIFY(!result.root.children.front().children.empty());
+    }
+
+    const ConfigNode *findByKey(const ConfigNode &parent, const std::string &key)
+    {
+        for(const auto &c : parent.children) {
+            if(c.key == key)
+                return &c;
+        }
+        return nullptr;
     }
 
 private slots:
@@ -79,14 +92,6 @@ private slots:
         auto result = m_parser.parse(readFixture("sample.toml"));
         QVERIFY(result.ok);
 
-        auto findByKey = [](const ConfigNode &parent,
-                            const std::string &key) -> const ConfigNode * {
-            for(const auto &c : parent.children)
-                if(c.key == key)
-                    return &c;
-            return nullptr;
-        };
-
         const auto *owner = findByKey(result.root, "owner");
         QVERIFY(owner != nullptr);
         QCOMPARE(owner->type, ConfigNode::Type::Object);
@@ -100,14 +105,6 @@ private slots:
     {
         auto result = m_parser.parse(readFixture("sample.toml"));
         QVERIFY(result.ok);
-
-        auto findByKey = [](const ConfigNode &parent,
-                            const std::string &key) -> const ConfigNode * {
-            for(const auto &c : parent.children)
-                if(c.key == key)
-                    return &c;
-            return nullptr;
-        };
 
         const auto *types = findByKey(result.root, "types");
         QVERIFY(types != nullptr);
@@ -127,10 +124,62 @@ private slots:
         }
     }
 
+    void test_commentExtraction()
+    {
+        auto result = m_parser.parse(readFixture("sample.toml"));
+        QVERIFY(result.ok);
+
+        const auto *title = findByKey(result.root, "title");
+        QVERIFY(title != nullptr);
+        QCOMPARE(title->comment, std::string("TOML 1.0 sample for DataTreeViewer testing"));
+
+        const auto *emptySection = findByKey(result.root, "empty_section");
+        QVERIFY(emptySection != nullptr);
+        QCOMPARE(emptySection->comment, std::string("Standalone section tests"));
+    }
+
+    void test_inlineComment()
+    {
+        auto result = m_parser.parse(
+            "title = \"TOML\" # inline title\n"
+            "hash = \"value # not comment\"\n");
+        QVERIFY(result.ok);
+
+        const auto *title = findByKey(result.root, "title");
+        QVERIFY(title != nullptr);
+        QCOMPARE(title->comment, std::string("inline title"));
+
+        const auto *hash = findByKey(result.root, "hash");
+        QVERIFY(hash != nullptr);
+        QCOMPARE(hash->scalar, std::string("value # not comment"));
+        QVERIFY(hash->comment.empty());
+    }
+
+    void test_preservesLoadOrder()
+    {
+        auto result = m_parser.parse(readFixture("sample.toml"));
+        QVERIFY(result.ok);
+
+        const std::vector<std::string> expected = {
+            "title", "owner", "database", "servers", "products", "empty_section", "types",
+        };
+        QVERIFY(result.root.children.size() >= expected.size());
+        for(size_t i = 0; i < expected.size(); ++i)
+            QCOMPARE(result.root.children[i].key, expected[i]);
+    }
+
     void test_sourceLine()
     {
         auto result = m_parser.parse(readFixture("sample.toml"));
         QVERIFY(result.ok);
+
+        const auto *title = findByKey(result.root, "title");
+        QVERIFY(title != nullptr);
+        QCOMPARE(title->source_line, 3);
+
+        const auto *owner = findByKey(result.root, "owner");
+        QVERIFY(owner != nullptr);
+        QCOMPARE(owner->source_line, 5);
 
         // Walk tree, at least some nodes should have source_line > 0
         std::function<bool(const ConfigNode &)> hasLines = [&](const ConfigNode &node) -> bool {
@@ -149,6 +198,7 @@ private slots:
         auto result = m_parser.parse(readFixture("broken.toml"));
         QVERIFY(result.ok);
         QVERIFY(result.has_parse_error);
+        QVERIFY(result.err_line > 0);
         verifyParseErrorTree(result);
     }
 };

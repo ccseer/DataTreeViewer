@@ -45,6 +45,7 @@ void TreeDelegate::paint(QPainter *painter, const QStyleOptionViewItem &option,
         const int textX = iconX + iconSize + iconGap;
         QFont keyFont = opt.font;
         QFont commentFont = keyFont;
+        commentFont.setBold(false);
         commentFont.setItalic(true);
 
         QFontMetrics keyFm(keyFont);

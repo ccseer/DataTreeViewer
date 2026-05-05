@@ -2,10 +2,33 @@
 
 #include <toml++/toml.hpp>
 
+#include <algorithm>
+#include <iostream>
+#include <sstream>
+
 #include "core/parser_registry.h"
 #include "core/parser_helpers.h"
 
+#ifdef _WIN32
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#endif
+
 namespace {
+
+void traceToml(const std::string &message)
+{
+    const std::string line = "[TomlParser] " + message;
+#ifdef _WIN32
+    OutputDebugStringA((line + "\n").c_str());
+#endif
+    std::clog << line << std::endl;
+}
 
 ConfigNode walk(const toml::node& n)
 {
@@ -72,6 +95,22 @@ ConfigNode walk(const toml::node& n)
     return node;
 }
 
+void sortObjectsBySourceLine(ConfigNode &node)
+{
+    for(auto &child : node.children)
+        sortObjectsBySourceLine(child);
+
+    if(node.type != ConfigNode::Type::Object)
+        return;
+
+    std::stable_sort(node.children.begin(), node.children.end(),
+                     [](const ConfigNode &a, const ConfigNode &b) {
+                         if(a.source_line <= 0 || b.source_line <= 0)
+                             return false;
+                         return a.source_line < b.source_line;
+                     });
+}
+
 } // namespace
 
 std::string TomlParser::library_credit() const
@@ -85,22 +124,32 @@ std::string TomlParser::library_credit() const
 ParseResult TomlParser::parse(std::string_view data)
 {
     ParseResult result;
+    traceToml("parse enter, bytes=" + std::to_string(data.size()));
 
 #if TOML_EXCEPTIONS
     try {
         auto tbl = toml::parse(data);
+        traceToml("toml++ parse ok, walking tree");
         result.root = walk(tbl);
+        sortObjectsBySourceLine(result.root);
+        traceToml("walk complete, children=" + std::to_string(result.root.children.size()));
 
         auto commentMap = dtv::core::extractComments(data);
         dtv::core::applyComments(result.root, commentMap);
+        traceToml("comments applied");
 
         result.ok   = true;
+        traceToml("parse leave ok");
     } catch (const toml::parse_error& e) {
-        result.root = dtv::core::createErrorNode(e.description(), static_cast<int>(e.source().begin.line));
+        const int line = e.source().begin.line > 0 ? static_cast<int>(e.source().begin.line) : -1;
+        traceToml("toml++ parse error: " + std::string(e.description()));
+        result.root = dtv::core::createErrorNode(e.description(), line);
         result.ok   = true;
         result.has_parse_error = true;
         result.error = e.description();
+        result.err_line = line;
     } catch (const std::exception& e) {
+        traceToml("parse exception: " + std::string(e.what()));
         result.root = dtv::core::createErrorNode(e.what());
         result.ok    = true;
         result.has_parse_error = true;
@@ -109,13 +158,25 @@ ParseResult TomlParser::parse(std::string_view data)
 #else
     auto parseRes = toml::parse(data);
     if (parseRes) {
+        traceToml("toml++ parse ok, walking tree");
         result.root = walk(parseRes.table());
+        sortObjectsBySourceLine(result.root);
+        traceToml("walk complete, children=" + std::to_string(result.root.children.size()));
+        auto commentMap = dtv::core::extractComments(data);
+        dtv::core::applyComments(result.root, commentMap);
+        traceToml("comments applied");
         result.ok   = true;
+        traceToml("parse leave ok");
     } else {
-        result.root = dtv::core::createErrorNode(std::string(parseRes.error().description()), static_cast<int>(parseRes.error().source().begin.line));
+        const int line = parseRes.error().source().begin.line > 0
+            ? static_cast<int>(parseRes.error().source().begin.line)
+            : -1;
+        traceToml("toml++ parse error: " + std::string(parseRes.error().description()));
+        result.root = dtv::core::createErrorNode(std::string(parseRes.error().description()), line);
         result.ok   = true;
         result.has_parse_error = true;
         result.error = std::string(parseRes.error().description());
+        result.err_line = line;
     }
 #endif
 
