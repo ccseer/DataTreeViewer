@@ -140,6 +140,9 @@ void StatusBar::updateTheme(bool dark, qreal dpr)
 {
     m_isDarkMode = dark;
     m_dpr = dpr;
+    setFixedHeight(qRound(26 * m_dpr));
+    if(auto *lay = qobject_cast<QHBoxLayout *>(layout()))
+        lay->setContentsMargins(qRound(12 * m_dpr), 0, qRound(12 * m_dpr), 0);
     if(m_hasLoadInfo)
         repaintInfoIcon();
 }

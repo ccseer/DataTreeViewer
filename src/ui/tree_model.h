@@ -38,6 +38,7 @@ private:
 
     QIcon m_objIcon;
     QIcon m_arrIcon;
+    QIcon m_emptyIcon;
 
     void refreshIcons();
     static QString containerHint(const ConfigNode &node);

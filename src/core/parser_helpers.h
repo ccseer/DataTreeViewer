@@ -22,7 +22,8 @@ CommentMap extractComments(std::string_view data);
 void applyComments(ConfigNode &node, const CommentMap &map);
 
 /** Create a standard error tree structure for parse failures. */
-ConfigNode createErrorNode(const std::string &msg, int line = -1);
+ConfigNode createErrorNode(const std::string &msg, int line = -1,
+                           const std::string &title = "PARSE ERROR");
 
 } // namespace core
 } // namespace dtv

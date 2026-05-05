@@ -7,7 +7,6 @@
 struct ConfigNode;
 struct ParseResult;
 class BreadcrumbBar;
-class QLabel;
 class QPushButton;
 class SearchBar;
 class StatusBar;
@@ -47,7 +46,7 @@ private:
     void onBreadcrumbClicked(int pathIndex);
     void onFilterChanged(const QString &text);
     void onTextViewBtnClicked();
-    void showError(const std::string &message, int errLine);
+    void showError(const std::string &message, int errLine, const std::string &title = "ERROR");
     void updateStatusTooltip();
     void reapplyStyles();
 
@@ -55,7 +54,6 @@ private:
     TreeRenderer *m_renderer = nullptr;
     SearchBar *m_search = nullptr;
     StatusBar *m_status = nullptr;
-    QLabel *m_errorLabel = nullptr;
     QPushButton *m_btn_text_view = nullptr;
 
     int m_generation = 0;

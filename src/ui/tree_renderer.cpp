@@ -48,7 +48,8 @@ void TreeRenderer::showEvent(QShowEvent *event)
     int w = width();
     if(w > 0)
         header()->resizeSection(0, w / 3);
-    setIndentation(20);
+    if(indentation() <= 0)
+        setIndentation(22);
 }
 
 void TreeRenderer::drawBranches(QPainter *painter, const QRect &rect,
@@ -108,6 +109,13 @@ void TreeRenderer::setExpandAll(bool on)
 void TreeRenderer::setDarkMode(bool on)
 {
     m_model->setDarkMode(on);
+}
+
+void TreeRenderer::updateDPR(qreal r)
+{
+    setIndentation(qRound(22 * r));
+    setIconSize(QSize(qRound(18 * r), qRound(18 * r)));
+    scheduleDelayedItemsLayout();
 }
 
 void TreeRenderer::applyFilter(const QString &text)

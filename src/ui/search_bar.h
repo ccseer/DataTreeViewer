@@ -2,6 +2,7 @@
 
 #include <QWidget>
 
+class QLabel;
 class QLineEdit;
 class QTimer;
 
@@ -12,6 +13,8 @@ public:
 
     QString text() const;
     void    clear();
+    void    updateDPR(qreal r);
+    void    updateTheme(bool dark);
 
 protected:
     bool eventFilter(QObject* obj, QEvent* event) override;
@@ -22,6 +25,12 @@ signals:
     void prevMatch();
 
 private:
-    QLineEdit* m_edit  = nullptr;
-    QTimer*    m_timer = nullptr;
+    void refreshIcon();
+    void positionIcon();
+
+    QLabel* m_searchIcon = nullptr;
+    QLineEdit* m_edit = nullptr;
+    QTimer* m_timer = nullptr;
+    qreal m_dpr = 1.0;
+    bool m_isDarkMode = false;
 };

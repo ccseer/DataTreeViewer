@@ -16,6 +16,7 @@ public:
     void clear();
     void setExpandAll(bool on);
     void setDarkMode(bool on);
+    void updateDPR(qreal r);
 
     void applyFilter(const QString &text);
     void selectNextMatch();

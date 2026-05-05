@@ -2,7 +2,6 @@
 
 #include <QApplication>
 #include <QFileInfo>
-#include <QLabel>
 #include <QLayout>
 #include <QPalette>
 #include <QPointer>
@@ -11,6 +10,7 @@
 
 #include "breadcrumb_bar.h"
 #include "core/iformat_parser.h"
+#include "core/parser_helpers.h"
 #include "core/parser_registry.h"
 #include "search_bar.h"
 #include "status_bar.h"
@@ -42,7 +42,7 @@ QString statusValueForNode(const ConfigNode &node)
     if(value.size() > kMaxStatusChars)
         value = value.left(kMaxStatusChars) + "...";
 
-    return value.isEmpty() ? QString() : QString(" =  %1").arg(value);
+    return value;
 }
 
 } // namespace
@@ -65,13 +65,6 @@ void DataTreeViewer::init()
     m_search = new SearchBar(this);
     m_status = new StatusBar(this);
     m_status->setBreadcrumb(m_breadcrumb);
-
-    m_errorLabel = new QLabel(this);
-    m_errorLabel->setAlignment(Qt::AlignCenter);
-    m_errorLabel->setWordWrap(true);
-    m_errorLabel->setStyleSheet("QLabel { color: #cc0000; font-size: 14px; "
-                                "background: rgba(255,255,255,0.92); padding: 24px; }");
-    m_errorLabel->hide();
 
     connect(m_renderer, &TreeRenderer::nodeActivated, this, &DataTreeViewer::onNodeActivated);
     connect(m_breadcrumb, &BreadcrumbBar::segmentClicked, this,
@@ -187,10 +180,9 @@ void DataTreeViewer::onParseCompleted(std::shared_ptr<const ParseResult> result,
             << "errorBytes" << result->error.size()
             << "rootChildren" << result->root.children.size();
 
-    m_errorLabel->hide();
-
     if(!result->ok) {
-        showError(result->error, result->err_line);
+        const std::string title = result->format_name.empty() ? "ERROR" : "PARSE ERROR";
+        showError(result->error, result->err_line, title);
         emit sigCommand(VCT_StateChange, VCV_Error);
         return;
     }
@@ -202,13 +194,13 @@ void DataTreeViewer::onParseCompleted(std::shared_ptr<const ParseResult> result,
         m_renderer->expandAll();
     m_breadcrumb->clear();
 
-    m_status->setLoadInfo(m_lastResult->total_nodes, m_lastResult->file_bytes, elapsedMs,
-                          QString::fromStdString(m_lastResult->format_name),
+    const QString formatName = QString::fromStdString(m_lastResult->format_name);
+    m_status->setLoadInfo(m_lastResult->total_nodes, m_lastResult->file_bytes, elapsedMs, formatName,
                           QString::fromStdString(m_lastResult->library_credit));
 
     if(m_lastResult->has_parse_error)
-        m_status->setValueText(QString("JSONC Parse Error: %1")
-                                   .arg(QString::fromStdString(m_lastResult->error)));
+        m_status->setValueText(QString("%1 Parse Error: %2")
+                                   .arg(formatName, QString::fromStdString(m_lastResult->error)));
 
     emit sigCommand(VCT_StateChange, VCV_Loaded);
     qprintt << "loaded" << m_lastResult->total_nodes << "nodes" << elapsedMs << "ms";
@@ -235,7 +227,8 @@ void DataTreeViewer::onNodeActivated(const ConfigNode *node)
 
     QStringList segments;
     for(QModelIndex cur = current; cur.isValid(); cur = cur.parent()) {
-        QString key = cur.data(Qt::DisplayRole).toString();
+        QModelIndex keyIndex = cur.sibling(cur.row(), 0);
+        QString key = keyIndex.data(Qt::DisplayRole).toString();
         if(!cur.parent().isValid() && key.isEmpty())
             key = "root";
         segments.prepend(key);
@@ -274,19 +267,25 @@ void DataTreeViewer::onTextViewBtnClicked()
     emit sigCommand(VCT_LoadViewerWithNewType, QString("Text"));
 }
 
-void DataTreeViewer::showError(const std::string &message, int errLine)
+void DataTreeViewer::showError(const std::string &message, int errLine, const std::string &title)
 {
-    m_renderer->clear();
+    auto errorResult = std::make_shared<ParseResult>();
+    errorResult->ok = false;
+    errorResult->error = message;
+    errorResult->err_line = errLine;
+    errorResult->root = dtv::core::createErrorNode(message, errLine, title);
+    m_lastResult = std::move(errorResult);
+
+    m_renderer->setExpandAll(true);
+    m_renderer->render(m_lastResult->root);
+    m_renderer->expandAll();
     m_breadcrumb->clear();
+    m_status->restoreInfo();
 
     QString text = QString::fromStdString(message);
     if(errLine >= 0)
-        text = QString("Parse error — line %1:\n%2").arg(errLine).arg(text);
-
-    m_errorLabel->setText(text);
-    m_errorLabel->resize(size());
-    m_errorLabel->show();
-    m_errorLabel->raise();
+        text = QString("Error line %1: %2").arg(errLine).arg(text);
+    m_status->setValueText(text);
 
     qprintt << "ERROR" << text;
 }
@@ -324,11 +323,14 @@ void DataTreeViewer::reapplyStyles()
     if(m_renderer) {
         m_renderer->setPalette(p);
         m_renderer->setDarkMode(m_isDarkMode);
+        m_renderer->updateDPR(r);
     }
 
     if(m_search) {
         m_search->setFont(font);
-        m_search->setFixedHeight(qRound(42 * r));
+        m_search->setFixedHeight(qRound(30 * r));
+        m_search->updateDPR(r);
+        m_search->updateTheme(m_isDarkMode);
         const QString borderColor = m_isDarkMode ? Colors::DarkBorder : Colors::LightBorder;
         const QString inputColor = m_isDarkMode ? Colors::DarkInput : Colors::LightInput;
         const QString textColor = m_isDarkMode ? Colors::DarkText : Colors::LightText;
@@ -356,11 +358,11 @@ void DataTreeViewer::reapplyStyles()
     if(m_btn_text_view) {
         constexpr int ctrlbar_btn_sz = 30;
         constexpr int ctrlbar_btn_icon_sz = 24;
-        QColor accentColor(Colors::Accent);
+        QColor iconColor(m_isDarkMode ? Colors::DarkText : Colors::LightText);
         m_btn_text_view->setFixedSize(qRound(ctrlbar_btn_sz * r), qRound(ctrlbar_btn_sz * r));
         m_btn_text_view->setIconSize(
             QSize(qRound(ctrlbar_btn_icon_sz * r), qRound(ctrlbar_btn_icon_sz * r)));
         m_btn_text_view->setIcon(
-            dtv::ui::createMultiStateIcon(g_svg_article, accentColor, ctrlbar_btn_icon_sz));
+            dtv::ui::createMultiStateIcon(g_svg_article, iconColor, ctrlbar_btn_icon_sz));
     }
 }

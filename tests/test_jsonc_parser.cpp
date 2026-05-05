@@ -17,6 +17,13 @@ private:
         return f.readAll().toStdString();
     }
 
+    void verifyParseErrorTree(const ParseResult &result)
+    {
+        QVERIFY(!result.root.children.empty());
+        QCOMPARE(result.root.children.front().key, std::string("PARSE ERROR"));
+        QVERIFY(!result.root.children.front().children.empty());
+    }
+
 private slots:
     void test_formatName()
     {
@@ -34,7 +41,7 @@ private slots:
         auto result = m_parser.parse("");
         QVERIFY(result.ok);
         QVERIFY(result.has_parse_error);
-        QCOMPARE(result.root.key, std::string("PARSE ERROR"));
+        verifyParseErrorTree(result);
     }
 
     void test_parseValid_data()
@@ -68,7 +75,7 @@ private slots:
         QVERIFY(result.ok);
         QVERIFY(result.has_parse_error);
         QVERIFY(!result.error.empty());
-        QCOMPARE(result.root.key, std::string("PARSE ERROR"));
+        verifyParseErrorTree(result);
     }
 
     void test_nestedContainers()
@@ -210,7 +217,7 @@ private slots:
         QVERIFY(result.ok);
         QVERIFY(result.has_parse_error);
         QVERIFY(!result.error.empty());
-        QCOMPARE(result.root.key, std::string("PARSE ERROR"));
+        verifyParseErrorTree(result);
     }
 };
 

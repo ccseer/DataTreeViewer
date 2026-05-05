@@ -35,6 +35,12 @@ inline constexpr const char *LightInput = "#FFFFFF";
 
 // --- SVGs (Material Symbols) ---
 
+// Material Symbol: "Search"
+inline constexpr auto g_svg_search = R"SVG(
+<svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 -960 960 960" width="24">
+  <path fill="currentColor" d="M784-120 532-372q-30 24-69 38t-83 14q-109 0-184.5-75.5T120-580q0-109 75.5-184.5T380-840q109 0 184.5 75.5T640-580q0 44-14 83t-38 69l252 252-56 56ZM380-400q75 0 127.5-52.5T560-580q0-75-52.5-127.5T380-760q-75 0-127.5 52.5T200-580q0 75 52.5 127.5T380-400Z"/>
+</svg>)SVG";
+
 // Material Symbol: "Article" (text view button)
 inline constexpr auto g_svg_article = R"SVG(
 <svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 -960 960 960" width="24">
@@ -72,6 +78,11 @@ inline constexpr auto g_qss_top_bar = R"(
         color: %4; padding: %7px %8px; selection-background-color: %5;
     }
     QLineEdit:focus { border: 1px solid %5; }
+    QPushButton {
+        border: none; background: transparent; border-radius: %6px; padding: %7px;
+    }
+    QPushButton:hover { background-color: rgba(128, 128, 128, 40); }
+    QPushButton:pressed { background-color: rgba(128, 128, 128, 60); }
 )";
 
 // Placeholder args: %1: SurfaceBG, %2: Border

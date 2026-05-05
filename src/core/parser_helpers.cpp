@@ -155,31 +155,36 @@ void applyComments(ConfigNode &node, const CommentMap &map)
     }
 }
 
-ConfigNode createErrorNode(const std::string &msg, int line)
+ConfigNode createErrorNode(const std::string &msg, int line, const std::string &title)
 {
     ConfigNode root;
     root.type = ConfigNode::Type::Object;
-    root.key = "PARSE ERROR";
+
+    ConfigNode errorNode;
+    errorNode.key = title;
+    errorNode.type = ConfigNode::Type::Object;
 
     ConfigNode msgNode;
     msgNode.key = "Message";
     msgNode.type = ConfigNode::Type::String;
     msgNode.scalar = msg;
-    root.children.push_back(std::move(msgNode));
+    errorNode.children.push_back(std::move(msgNode));
 
     if(line != -1) {
         ConfigNode lineNode;
         lineNode.key = "Line/Byte";
         lineNode.type = ConfigNode::Type::Integer;
         lineNode.scalar = std::to_string(line);
-        root.children.push_back(std::move(lineNode));
+        errorNode.children.push_back(std::move(lineNode));
     }
 
     ConfigNode hintNode;
     hintNode.key = "Hint";
     hintNode.type = ConfigNode::Type::String;
     hintNode.scalar = "The file contains syntax errors. Please check the structure and indentation.";
-    root.children.push_back(std::move(hintNode));
+    errorNode.children.push_back(std::move(hintNode));
+
+    root.children.push_back(std::move(errorNode));
 
     return root;
 }

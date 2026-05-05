@@ -5,6 +5,7 @@
 #include <QIcon>
 #include <QPainter>
 #include <QPalette>
+#include <QPixmap>
 #include <QStyle>
 #include <QStyleOptionViewItem>
 
@@ -17,7 +18,7 @@ void TreeDelegate::paint(QPainter *painter, const QStyleOptionViewItem &option,
                          const QModelIndex &index) const
 {
     const QString comment = index.data(TreeModel::CommentRole).toString();
-    if(index.column() == 0 && !comment.isEmpty()) {
+    if(index.column() == 0) {
         QStyleOptionViewItem opt = option;
         initStyleOption(&opt, index);
 
@@ -34,11 +35,14 @@ void TreeDelegate::paint(QPainter *painter, const QStyleOptionViewItem &option,
             opt.palette.color(selected ? QPalette::HighlightedText : QPalette::PlaceholderText);
         commentColor.setAlpha(selected ? 190 : 155);
 
-        QRect iconRect = style->subElementRect(QStyle::SE_ItemViewItemDecoration, &opt, opt.widget);
-        QRect textRect = style->subElementRect(QStyle::SE_ItemViewItemText, &opt, opt.widget);
-        if(textRect.isNull())
-            textRect = opt.rect.adjusted(4, 3, -4, -3);
-
+        const qreal dpr = opt.widget ? opt.widget->devicePixelRatioF() : 1.0;
+        const int iconSize = qRound(18 * dpr);
+        const int iconGap = qRound(4 * dpr);
+        const int topPad = qRound(3 * dpr);
+        const int sidePad = qRound(4 * dpr);
+        QRect contentRect = opt.rect.adjusted(sidePad, topPad, -sidePad, -topPad);
+        const int iconX = contentRect.left();
+        const int textX = iconX + iconSize + iconGap;
         QFont keyFont = opt.font;
         QFont commentFont = keyFont;
         commentFont.setItalic(true);
@@ -46,20 +50,25 @@ void TreeDelegate::paint(QPainter *painter, const QStyleOptionViewItem &option,
         QFontMetrics keyFm(keyFont);
         QFontMetrics commentFm(commentFont);
         const int keyHeight = keyFm.height();
-        QRect keyRect(textRect.left(), textRect.top() + 3, textRect.width(), keyHeight);
-        QRect commentRect(textRect.left(), keyRect.bottom() + 2, textRect.width(),
-                          commentFm.height());
+        const int commentGap = comment.isEmpty() ? 0 : qRound(2 * dpr);
+        const int commentHeight = comment.isEmpty() ? 0 : commentFm.height();
+        const int totalTextHeight = keyHeight + commentGap + commentHeight;
+        const int startY = contentRect.top() + qMax(0, (contentRect.height() - totalTextHeight) / 2);
+        QRect keyRect(textX, startY, contentRect.right() - textX + 1, keyHeight);
+        QRect commentRect(textX, keyRect.bottom() + commentGap,
+                          contentRect.right() - textX + 1, commentHeight);
 
         painter->save();
         if(!opt.icon.isNull()) {
-            QSize iconSize = opt.decorationSize;
-            if(iconSize.width() <= 0 || iconSize.height() <= 0)
-                iconSize = QSize(18, 18);
-            QPixmap pix = opt.icon.pixmap(iconSize, selected ? QIcon::Selected : QIcon::Normal,
+            QSize drawIconSize = opt.decorationSize;
+            if(drawIconSize.width() <= 0 || drawIconSize.height() <= 0)
+                drawIconSize = QSize(iconSize, iconSize);
+            QPixmap pix = opt.icon.pixmap(drawIconSize,
+                                          selected ? QIcon::Selected : QIcon::Normal,
                                           QIcon::On);
-            QRect centeredIcon(iconRect.left(),
-                               keyRect.top() + (keyRect.height() - iconSize.height()) / 2,
-                               iconSize.width(), iconSize.height());
+            QRect centeredIcon(iconX,
+                               startY + (keyHeight - drawIconSize.height()) / 2,
+                               drawIconSize.width(), drawIconSize.height());
             painter->drawPixmap(centeredIcon, pix);
         }
 
@@ -68,15 +77,18 @@ void TreeDelegate::paint(QPainter *painter, const QStyleOptionViewItem &option,
         painter->drawText(keyRect, Qt::AlignLeft | Qt::AlignVCenter,
                           keyFm.elidedText(opt.text, Qt::ElideRight, keyRect.width()));
 
-        QString commentText = comment;
-        commentText.replace('\n', QStringLiteral(" "));
-        commentText.remove('\r');
-        commentText = QStringLiteral("// ") + commentText.simplified();
+        if(!comment.isEmpty()) {
+            QString commentText = comment;
+            commentText.replace('\n', QStringLiteral(" "));
+            commentText.remove('\r');
+            commentText = QStringLiteral("// ") + commentText.simplified();
 
-        painter->setFont(commentFont);
-        painter->setPen(commentColor);
-        painter->drawText(commentRect, Qt::AlignLeft | Qt::AlignVCenter,
-                          commentFm.elidedText(commentText, Qt::ElideRight, commentRect.width()));
+            painter->setFont(commentFont);
+            painter->setPen(commentColor);
+            painter->drawText(commentRect, Qt::AlignLeft | Qt::AlignVCenter,
+                              commentFm.elidedText(commentText, Qt::ElideRight,
+                                                   commentRect.width()));
+        }
         painter->restore();
         return;
     }
@@ -99,7 +111,9 @@ void TreeDelegate::initStyleOption(QStyleOptionViewItem *option, const QModelInd
         // Force the icon to use its 'Selected' state pixmap
         if(!option->icon.isNull()) {
             QSize sz = option->decorationSize;
-            if (sz.width() <= 0) sz = QSize(18, 18);
+            if(sz.width() <= 0 || sz.height() <= 0)
+                sz = QSize(18, 18);
+            option->decorationSize = sz;
             option->icon = option->icon.pixmap(sz, QIcon::Selected, QIcon::On);
         }
     }

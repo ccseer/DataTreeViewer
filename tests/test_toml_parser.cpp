@@ -17,6 +17,13 @@ private:
         return f.readAll().toStdString();
     }
 
+    void verifyParseErrorTree(const ParseResult &result)
+    {
+        QVERIFY(!result.root.children.empty());
+        QCOMPARE(result.root.children.front().key, std::string("PARSE ERROR"));
+        QVERIFY(!result.root.children.front().children.empty());
+    }
+
 private slots:
     void test_formatName()
     {
@@ -64,7 +71,7 @@ private slots:
         auto result = m_parser.parse(input.toStdString());
         QVERIFY(result.ok);
         QVERIFY(result.has_parse_error);
-        QCOMPARE(result.root.key, std::string("PARSE ERROR"));
+        verifyParseErrorTree(result);
     }
 
     void test_nestedContainers()
@@ -142,7 +149,7 @@ private slots:
         auto result = m_parser.parse(readFixture("broken.toml"));
         QVERIFY(result.ok);
         QVERIFY(result.has_parse_error);
-        QCOMPARE(result.root.key, std::string("PARSE ERROR"));
+        verifyParseErrorTree(result);
     }
 };
 

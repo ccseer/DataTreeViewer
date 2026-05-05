@@ -9,6 +9,7 @@
 #include <QFont>
 #include <QHeaderView>
 #include <QPalette>
+#include <QPixmap>
 
 #include "core/config_node.h"
 #include "style_assets.h"
@@ -38,6 +39,9 @@ void TreeModel::refreshIcons()
 
     m_objIcon = createIcon(g_svg_object, objColor, sz);
     m_arrIcon = createIcon(g_svg_array, arrColor, sz);
+    QPixmap empty(sz, sz);
+    empty.fill(Qt::transparent);
+    m_emptyIcon = QIcon(empty);
 }
 
 void TreeModel::render(const ConfigNode &root)
@@ -175,6 +179,7 @@ QVariant TreeModel::data(const QModelIndex &index, int role) const
             return m_objIcon;
         if(node->type == ConfigNode::Type::Array)
             return m_arrIcon;
+        return m_emptyIcon;
     }
 
     if(role == Qt::ForegroundRole) {
