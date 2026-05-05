@@ -4,6 +4,7 @@
 
 class QLabel;
 class QLineEdit;
+class QPushButton;
 class QTimer;
 
 class SearchBar : public QWidget {

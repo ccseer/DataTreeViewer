@@ -1,10 +1,11 @@
 #include "tree_filter_proxy.h"
-
+#include "core/config_node.h"
 #include <QAbstractItemView>
 
 TreeFilterProxyModel::TreeFilterProxyModel(QObject *parent) : QSortFilterProxyModel(parent)
 {
     setRecursiveFilteringEnabled(true);
+    setDynamicSortFilter(true);
 }
 
 void TreeFilterProxyModel::setSearchText(const QString &text)
@@ -115,4 +116,36 @@ void TreeFilterProxyModel::rebuildMatchCache() const
     m_matchCache.clear();
     collectMatches(QModelIndex());
     m_cacheDirty = false;
+}
+
+bool TreeFilterProxyModel::lessThan(const QModelIndex &source_left,
+                                   const QModelIndex &source_right) const
+{
+    const ConfigNode *leftNode =
+        static_cast<const ConfigNode *>(source_left.internalPointer());
+    const ConfigNode *rightNode =
+        static_cast<const ConfigNode *>(source_right.internalPointer());
+
+    if(!leftNode || !rightNode)
+        return QSortFilterProxyModel::lessThan(source_left, source_right);
+
+    // If we have a parent, check if it's an array. We don't sort array elements.
+    QModelIndex parent = source_left.parent();
+    if(parent.isValid()) {
+        const ConfigNode *parentNode =
+            static_cast<const ConfigNode *>(parent.internalPointer());
+        if(parentNode && parentNode->type == ConfigNode::Type::Array) {
+            // Arrays always stay in original order. We must compensate for DescendingOrder
+            // because QSortFilterProxyModel will invert the result.
+            if(sortOrder() == Qt::DescendingOrder)
+                return source_left.row() > source_right.row();
+            return source_left.row() < source_right.row();
+        }
+    }
+
+    // Default: alphabetical sort by key for Objects
+    QString leftKey = sourceModel()->data(source_left, Qt::DisplayRole).toString();
+    QString rightKey = sourceModel()->data(source_right, Qt::DisplayRole).toString();
+
+    return QString::compare(leftKey, rightKey, Qt::CaseInsensitive) < 0;
 }

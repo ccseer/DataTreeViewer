@@ -364,7 +364,7 @@ void DataTreeViewer::reapplyStyles()
                                     .arg(Colors::Accent)
                                     .arg(qRound(4 * r))
                                     .arg(qRound(4 * r))
-                                    .arg(qRound(10 * r)));
+                                    .arg(qRound(2 * r)));
     }
 
     if(!m_status)

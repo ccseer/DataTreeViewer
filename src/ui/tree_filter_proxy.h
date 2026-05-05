@@ -16,6 +16,7 @@ public:
 
 protected:
     bool filterAcceptsRow(int row, const QModelIndex &parent) const override;
+    bool lessThan(const QModelIndex &source_left, const QModelIndex &source_right) const override;
 
 private:
     bool hasAcceptedChild(int row, const QModelIndex &parent) const;

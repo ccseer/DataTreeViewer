@@ -1,9 +1,14 @@
 #include "tree_renderer.h"
 
+#include <QAction>
+#include <QApplication>
+#include <QClipboard>
+#include <QContextMenuEvent>
 #include <QFont>
 #include <QHeaderView>
-#include <QShowEvent>
+#include <QMenu>
 #include <QPainter>
+#include <QShowEvent>
 
 #include "core/config_node.h"
 #include "tree_delegate.h"
@@ -145,4 +150,66 @@ const ConfigNode *TreeRenderer::currentNode() const
         return nullptr;
     QModelIndex src = m_proxy->mapToSource(current);
     return m_model->nodeFromIndex(src);
+}
+
+void TreeRenderer::contextMenuEvent(QContextMenuEvent *event)
+{
+    QMenu menu(this);
+    const ConfigNode *node = currentNode();
+
+    if(node) {
+        menu.addAction("Copy Key", this, &TreeRenderer::copyKey);
+        menu.addAction("Copy Value", this, &TreeRenderer::copyValue);
+        menu.addAction("Copy Key: Value", this, &TreeRenderer::copyKeyValuePair);
+        menu.addSeparator();
+    }
+
+    QMenu *sortMenu = menu.addMenu("Sort");
+    QAction *origAction = sortMenu->addAction("Original Order", this, [this] { m_proxy->sort(-1); });
+    QAction *ascAction =
+        sortMenu->addAction("A-Z (Ascending)", this, [this] { m_proxy->sort(0, Qt::AscendingOrder); });
+    QAction *descAction =
+        sortMenu->addAction("Z-A (Descending)", this, [this] { m_proxy->sort(0, Qt::DescendingOrder); });
+
+    // Mark current sort state
+    if(m_proxy->sortColumn() == -1)
+        origAction->setCheckable(true), origAction->setChecked(true);
+    else if(m_proxy->sortOrder() == Qt::AscendingOrder)
+        ascAction->setCheckable(true), ascAction->setChecked(true);
+    else
+        descAction->setCheckable(true), descAction->setChecked(true);
+
+    menu.addSeparator();
+    menu.addAction("Expand All", this, &TreeRenderer::expandAll);
+    menu.addAction("Collapse All", this, &TreeRenderer::collapseAll);
+
+    menu.exec(event->globalPos());
+}
+
+void TreeRenderer::copyKey()
+{
+    QModelIndex idx = currentIndex();
+    if(idx.isValid()) {
+        QString text = idx.sibling(idx.row(), 0).data(Qt::DisplayRole).toString();
+        QApplication::clipboard()->setText(text);
+    }
+}
+
+void TreeRenderer::copyValue()
+{
+    QModelIndex idx = currentIndex();
+    if(idx.isValid()) {
+        QString text = idx.sibling(idx.row(), 1).data(Qt::DisplayRole).toString();
+        QApplication::clipboard()->setText(text);
+    }
+}
+
+void TreeRenderer::copyKeyValuePair()
+{
+    QModelIndex idx = currentIndex();
+    if(idx.isValid()) {
+        QString key = idx.sibling(idx.row(), 0).data(Qt::DisplayRole).toString();
+        QString val = idx.sibling(idx.row(), 1).data(Qt::DisplayRole).toString();
+        QApplication::clipboard()->setText(QString("%1: %2").arg(key, val));
+    }
 }

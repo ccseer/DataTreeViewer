@@ -35,6 +35,12 @@ signals:
 protected:
     void showEvent(QShowEvent *event) override;
     void drawBranches(QPainter *painter, const QRect &rect, const QModelIndex &index) const override;
+    void contextMenuEvent(QContextMenuEvent *event) override;
+
+private slots:
+    void copyKey();
+    void copyValue();
+    void copyKeyValuePair();
 
 private:
     TreeModel *m_model = nullptr;

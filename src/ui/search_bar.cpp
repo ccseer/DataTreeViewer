@@ -4,6 +4,7 @@
 #include <QKeyEvent>
 #include <QLabel>
 #include <QLineEdit>
+#include <QPushButton>
 #include <QSizePolicy>
 #include <QTimer>
 
@@ -71,7 +72,7 @@ void SearchBar::updateDPR(qreal r)
     }
     const int height = qRound(30 * r);
     const int iconBox = qRound(20 * r);
-    const int iconGap = qRound(4 * r);
+    const int iconGap = qRound(2 * r);
     m_edit->setFixedHeight(height);
     m_edit->setTextMargins(iconBox + iconGap, 0, qRound(8 * r), 0);
     m_searchIcon->setFixedSize(iconBox, height);
