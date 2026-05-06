@@ -69,13 +69,18 @@ void StatusBar::setBreadcrumb(BreadcrumbBar *bar)
 }
 
 void StatusBar::setLoadInfo(int nodeCount, qint64 fileBytes, qint64 elapsedMs,
-                            const QString &formatName, const QString &libraryCredit)
+                            const QString &formatName, const QString &libraryCredit,
+                            int errorCount, const QString &warning)
 {
     QStringList lines;
     lines << QString("Format: %1").arg(formatName);
     lines << QString("Nodes: %1").arg(nodeCount);
     lines << QString("File size: %1").arg(fileSizeStr(fileBytes));
     lines << QString("Load time: %1 ms").arg(elapsedMs);
+    if(errorCount > 0)
+        lines << QString("Parse errors: %1").arg(errorCount);
+    if(!warning.isEmpty())
+        lines << QString("Notice: %1").arg(warning);
     if(!libraryCredit.isEmpty())
         lines << QString("Library: %1").arg(libraryCredit);
 

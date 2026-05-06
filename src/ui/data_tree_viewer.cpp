@@ -218,7 +218,9 @@ void DataTreeViewer::onParseCompleted(std::shared_ptr<const ParseResult> result,
 
     const QString formatName = QString::fromStdString(m_lastResult->format_name);
     m_status->setLoadInfo(m_lastResult->total_nodes, m_lastResult->file_bytes, elapsedMs, formatName,
-                          QString::fromStdString(m_lastResult->library_credit));
+                          QString::fromStdString(m_lastResult->library_credit),
+                          m_lastResult->error_count,
+                          QString::fromStdString(m_lastResult->warning));
 
     if(m_lastResult->has_parse_error)
         m_status->setValueText(QString("%1 Parse Error: %2")

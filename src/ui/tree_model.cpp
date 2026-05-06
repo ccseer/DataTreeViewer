@@ -210,6 +210,12 @@ QVariant TreeModel::data(const QModelIndex &index, int role) const
     }
 
     if(role == Qt::ForegroundRole) {
+        if(col == 0) {
+            if(!node->key.empty() && node->key[0] == '@')
+                return m_isDarkMode ? QColor("#CE93D8") : QColor("#6A1B9A");
+            if(node->key == "#text")
+                return m_isDarkMode ? QColor("#9E9E9E") : QColor("#757575");
+        }
         if(col == 1) {
             if(node->is_container()) {
                 QColor c = qApp->palette().color(QPalette::Text);

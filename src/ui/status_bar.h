@@ -13,7 +13,8 @@ public:
 
     void setBreadcrumb(BreadcrumbBar *bar);
     void setLoadInfo(int nodeCount, qint64 fileBytes, qint64 elapsedMs, const QString &formatName,
-                     const QString &libraryCredit);
+                     const QString &libraryCredit, int errorCount = 0,
+                     const QString &warning = {});
     void setSourceLine(int line);
     void setValueText(const QString &text);
     void showLoading();
