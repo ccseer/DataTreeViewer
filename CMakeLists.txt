@@ -166,6 +166,7 @@ if(BUILD_TESTS)
     find_package(Qt6 REQUIRED COMPONENTS Test)
 
     set(FIXTURES_DIR "${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures")
+    set(PARSER_TEST_TARGETS)
 
     function(add_parser_test NAME SOURCE)
         add_executable(${NAME} ${SOURCE})
@@ -183,6 +184,7 @@ if(BUILD_TESTS)
         target_compile_definitions(${NAME} PRIVATE
             FIXTURES_DIR="${FIXTURES_DIR}")
         add_test(NAME ${NAME} COMMAND ${NAME})
+        set(PARSER_TEST_TARGETS ${PARSER_TEST_TARGETS} ${NAME} PARENT_SCOPE)
     endfunction()
 
     add_parser_test(test_jsonc_parser tests/test_jsonc_parser.cpp)
@@ -192,4 +194,14 @@ if(BUILD_TESTS)
     add_parser_test(test_env_parser   tests/test_env_parser.cpp)
     add_parser_test(test_jsonl_parser tests/test_jsonl_parser.cpp)
     add_parser_test(test_cbor_parser  tests/test_cbor_parser.cpp)
+
+    add_custom_target(run_all_tests
+        COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure
+                $<$<BOOL:$<CONFIG>>:-C>
+                $<$<BOOL:$<CONFIG>>:$<CONFIG>>
+        DEPENDS ${PARSER_TEST_TARGETS}
+        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+        COMMENT "Building and running all parser tests"
+        USES_TERMINAL
+    )
 endif()
