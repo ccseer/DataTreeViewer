@@ -89,6 +89,8 @@ set(PARSER_SOURCES
     src/parsers/env_parser.cpp
     src/parsers/jsonl_parser.h
     src/parsers/jsonl_parser.cpp
+    src/parsers/cbor_parser.h
+    src/parsers/cbor_parser.cpp
 )
 
 set(WORKER_SOURCES
@@ -189,4 +191,5 @@ if(BUILD_TESTS)
     add_parser_test(test_yaml_parser  tests/test_yaml_parser.cpp)
     add_parser_test(test_env_parser   tests/test_env_parser.cpp)
     add_parser_test(test_jsonl_parser tests/test_jsonl_parser.cpp)
+    add_parser_test(test_cbor_parser  tests/test_cbor_parser.cpp)
 endif()
