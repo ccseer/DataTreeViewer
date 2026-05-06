@@ -84,6 +84,8 @@ set(PARSER_SOURCES
     src/parsers/ini_parser.cpp
     src/parsers/yaml_parser.h
     src/parsers/yaml_parser.cpp
+    src/parsers/env_parser.h
+    src/parsers/env_parser.cpp
 )
 
 set(WORKER_SOURCES
@@ -182,4 +184,5 @@ if(BUILD_TESTS)
     add_parser_test(test_toml_parser  tests/test_toml_parser.cpp)
     add_parser_test(test_ini_parser   tests/test_ini_parser.cpp)
     add_parser_test(test_yaml_parser  tests/test_yaml_parser.cpp)
+    add_parser_test(test_env_parser   tests/test_env_parser.cpp)
 endif()
