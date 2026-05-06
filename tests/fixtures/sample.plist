@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Name</key>
+    <string>DataTreeViewer</string>
+    <key>Version</key>
+    <integer>1</integer>
+    <key>Enabled</key>
+    <true/>
+    <key>Ratio</key>
+    <real>1.5</real>
+    <key>Created</key>
+    <date>2026-05-06T12:00:00Z</date>
+    <key>Payload</key>
+    <data>QUJDRA==</data>
+    <key>Items</key>
+    <array>
+        <string>one</string>
+        <false/>
+        <dict>
+            <key>Inner</key>
+            <string>x</string>
+        </dict>
+    </array>
+</dict>
+</plist>

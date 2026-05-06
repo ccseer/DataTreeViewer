@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<plist version="1.0">
+<array>
+    <string>alpha</string>
+    <integer>7</integer>
+    <true/>
+    <dict>
+        <key>Name</key>
+        <string>nested</string>
+    </dict>
+</array>
+</plist>

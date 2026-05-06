@@ -101,6 +101,8 @@ set(PARSER_SOURCES
     src/parsers/cbor_parser.cpp
     src/parsers/xml_parser.h
     src/parsers/xml_parser.cpp
+    src/parsers/plist_parser.h
+    src/parsers/plist_parser.cpp
 )
 
 set(WORKER_SOURCES
@@ -207,6 +209,7 @@ if(BUILD_TESTS)
     add_parser_test(test_jsonl_parser tests/test_jsonl_parser.cpp)
     add_parser_test(test_cbor_parser  tests/test_cbor_parser.cpp)
     add_parser_test(test_xml_parser   tests/test_xml_parser.cpp)
+    add_parser_test(test_plist_parser tests/test_plist_parser.cpp)
 
     add_custom_target(run_all_tests
         COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure
