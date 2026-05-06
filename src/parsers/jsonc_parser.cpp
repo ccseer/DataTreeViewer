@@ -10,6 +10,7 @@
 
 #include "core/parser_registry.h"
 #include "core/parser_helpers.h"
+#include "parsers/nlohmann_convert.h"
 
 #ifdef _WIN32
 #ifndef WIN32_LEAN_AND_MEAN
@@ -335,46 +336,6 @@ std::string stripComments(const std::string_view &data)
     return clean;
 }
 
-ConfigNode walkJ(const nlohmann::json &j)
-{
-    ConfigNode node;
-    try {
-        if (j.is_object()) {
-            node.type = ConfigNode::Type::Object;
-            for (auto it = j.begin(); it != j.end(); ++it) {
-                ConfigNode child = walkJ(it.value());
-                child.key = it.key();
-                node.children.push_back(std::move(child));
-            }
-        } else if (j.is_array()) {
-            node.type = ConfigNode::Type::Array;
-            for (const auto &elem : j) {
-                node.children.push_back(walkJ(elem));
-            }
-        } else if (j.is_string()) {
-            node.type = ConfigNode::Type::String;
-            node.scalar = j.get<std::string>();
-        } else if (j.is_number_integer() || j.is_number_unsigned()) {
-            node.type = ConfigNode::Type::Integer;
-            node.scalar = j.dump();
-        } else if (j.is_number_float()) {
-            node.type = ConfigNode::Type::Float;
-            node.scalar = j.dump();
-        } else if (j.is_boolean()) {
-            node.type = ConfigNode::Type::Bool;
-            node.scalar = j.get<bool>() ? "true" : "false";
-        } else if (j.is_null()) {
-            node.type = ConfigNode::Type::Null;
-            node.scalar = "null";
-        } else {
-            node.type = ConfigNode::Type::Null;
-        }
-    } catch (...) {
-        node.type = ConfigNode::Type::Null;
-    }
-    return node;
-}
-
 void annotateComments(ConfigNode &node, std::queue<CommentEntry> &comments)
 {
     if (comments.empty()) return;
@@ -417,7 +378,7 @@ ParseResult JsoncParser::parse(std::string_view data)
         }
 
         traceJsonc("nlohmann parse ok, walking tree");
-        result.root = walkJ(j);
+        result.root = dtv::core::convertNlohmann(j);
         traceJsonc("walk complete, annotating comments");
         annotateComments(result.root, comments);
         result.ok = true;

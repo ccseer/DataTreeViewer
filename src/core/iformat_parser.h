@@ -17,6 +17,8 @@ struct ParseResult {
     std::string library_credit;
     long long    file_bytes  = 0;
     int         total_nodes  = 0;
+    int         error_count  = 0;
+    std::string warning;
 };
 
 class IFormatParser {
