@@ -13,10 +13,18 @@
     "ini",
     "cfg",
     "conf",
+    "env",
     "toml",
-    "tml"
+    "tml",
+    "jsonl",
+    "ndjson",
+    "cbor",
+    "xml",
+    "svg",
+    "xhtml",
+    "plist"
   ],
   "appMinVersion": "4.2.9",
   "author": "corey",
-  "description": "Seer plugin for read-only tree-structured data preview (JSONC, YAML, INI, TOML)"
+  "description": "Seer plugin for read-only tree-structured data preview (JSON, JSONC, YAML, INI, ENV, TOML, JSONL, CBOR, XML, Plist)"
 }

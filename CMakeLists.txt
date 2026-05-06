@@ -6,12 +6,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
 
-if(MSVC AND PROJECT_IS_TOP_LEVEL)
-    add_compile_options("$<$<CONFIG:Release>:/Zi>")
-    add_link_options(
-        "$<$<CONFIG:Release>:/DEBUG>"
-        "$<$<CONFIG:Release>:/OPT:REF>"
-        "$<$<CONFIG:Release>:/OPT:ICF>")
+if(PROJECT_IS_TOP_LEVEL AND NOT CMAKE_CONFIGURATION_TYPES AND NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE RelWithDebInfo CACHE STRING "Build type" FORCE)
 endif()
 
 find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Svg)
