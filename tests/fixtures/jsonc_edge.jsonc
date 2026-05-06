@@ -1,0 +1,15 @@
+{
+    // object with tricky strings
+    "url": "https://example.com/#fragment",
+    "path": "C:\\temp\\file",
+    "array": [
+        1, // inline one
+        {
+            /* nested block */
+            "flag": true,
+            "note": "/* not a comment */"
+        }
+    ],
+    "empty_obj": {},
+    "empty_arr": []
+}

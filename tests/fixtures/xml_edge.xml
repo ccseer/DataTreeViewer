@@ -1,0 +1,8 @@
+<?xml version="1.0"?>
+<root attr="a">
+  text-before
+  <![CDATA[cdata text]]>
+  <item id="1">first</item>
+  <item id="2"/>
+  <!-- trailing item comment -->
+</root>

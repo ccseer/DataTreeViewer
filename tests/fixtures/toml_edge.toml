@@ -1,0 +1,23 @@
+title = "Edge TOML"
+
+[server]
+host = "localhost"
+ports = [8000, 8001, 8002]
+
+[database]
+enabled = true
+pi = 3.14159
+
+[clients]
+data = [ ["gamma", "delta"], [1, 2] ]
+
+[[products]]
+name = "Hammer"
+sku = 738594937
+
+[[products]]
+name = "Nail"
+sku = 284758393
+color = "gray"
+
+inline = { answer = 42, active = false }

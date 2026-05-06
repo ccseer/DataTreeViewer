@@ -48,6 +48,7 @@ private slots:
     {
         QTest::addColumn<QString>("path");
         QTest::newRow("sample") << "sample.jsonc";
+        QTest::newRow("edge") << "jsonc_edge.jsonc";
     }
 
     void test_parseValid()
@@ -241,6 +242,32 @@ private slots:
         QVERIFY(result.has_parse_error);
         QVERIFY(!result.error.empty());
         verifyParseErrorTree(result);
+    }
+
+    void test_edgeFixture()
+    {
+        auto result = m_parser.parse(readFixture("jsonc_edge.jsonc"));
+        QVERIFY(result.ok);
+        QCOMPARE(result.root.type, ConfigNode::Type::Object);
+
+        const auto *arrayNode = [&]() -> const ConfigNode * {
+            for(const auto &child : result.root.children)
+                if(child.key == "array")
+                    return &child;
+            return nullptr;
+        }();
+        QVERIFY(arrayNode != nullptr);
+        QCOMPARE(arrayNode->type, ConfigNode::Type::Array);
+        QCOMPARE(arrayNode->children.size(), size_t(2));
+
+        const auto *urlNode = [&]() -> const ConfigNode * {
+            for(const auto &child : result.root.children)
+                if(child.key == "url")
+                    return &child;
+            return nullptr;
+        }();
+        QVERIFY(urlNode != nullptr);
+        QCOMPARE(urlNode->scalar, std::string("https://example.com/#fragment"));
     }
 };
 

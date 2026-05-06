@@ -48,6 +48,7 @@ private slots:
     {
         QTest::addColumn<QString>("path");
         QTest::newRow("sample") << "sample.xml";
+        QTest::newRow("edge") << "xml_edge.xml";
     }
 
     void test_parseValid()
@@ -152,6 +153,22 @@ private slots:
         QVERIFY(!result.error.empty());
         QVERIFY(result.err_line > 0);
         verifyParseErrorTree(result);
+    }
+
+    void test_edgeFixture()
+    {
+        auto result = m_parser.parse(readFixture("xml_edge.xml"));
+        QVERIFY(result.ok);
+
+        const auto *root = findByKey(result.root, "root");
+        QVERIFY(root != nullptr);
+        QCOMPARE(root->type, ConfigNode::Type::Object);
+        QCOMPARE(root->children[0].key, std::string("@attr"));
+        QCOMPARE(root->children[1].key, std::string("#text"));
+        QCOMPARE(root->children[2].key, std::string("#text"));
+        QCOMPARE(root->children[3].key, std::string("item"));
+        QCOMPARE(root->children[4].key, std::string("item"));
+        QCOMPARE(root->comment, std::string("trailing item comment"));
     }
 };
 

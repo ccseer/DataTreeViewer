@@ -57,6 +57,7 @@ private slots:
     {
         QTest::addColumn<QString>("path");
         QTest::newRow("sample") << "sample.env";
+        QTest::newRow("edge") << "env_edge.env";
     }
 
     void test_parseValid()
@@ -191,6 +192,28 @@ private slots:
         QVERIFY(result.has_parse_error);
         QCOMPARE(result.error, std::string("File is not valid UTF-8 text"));
         verifyParseErrorTree(result);
+    }
+
+    void test_edgeFixture()
+    {
+        auto result = m_parser.parse(readFixture("env_edge.env"));
+        QVERIFY(result.ok);
+
+        const auto *unicode = findByKey(result.root, "UNICODE");
+        QVERIFY(unicode != nullptr);
+        QCOMPARE(QString::fromStdString(unicode->scalar), QString::fromUtf8("你好"));
+
+        const auto *multiEquals = findByKey(result.root, "MULTI_EQUALS");
+        QVERIFY(multiEquals != nullptr);
+        QCOMPARE(multiEquals->scalar, std::string("a=b=c"));
+
+        const auto *inlineNode = findByKey(result.root, "INLINE");
+        QVERIFY(inlineNode != nullptr);
+        QCOMPARE(inlineNode->comment, std::string("attached"));
+
+        const auto *afterReset = findByKey(result.root, "AFTER_RESET");
+        QVERIFY(afterReset != nullptr);
+        QVERIFY(afterReset->comment.empty());
     }
 };
 

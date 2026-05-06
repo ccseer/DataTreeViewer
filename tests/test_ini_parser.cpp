@@ -49,6 +49,7 @@ private slots:
     {
         QTest::addColumn<QString>("path");
         QTest::newRow("sample") << "sample.ini";
+        QTest::newRow("edge") << "ini_edge.ini";
     }
 
     void test_parseValid()
@@ -202,6 +203,49 @@ private slots:
         QVERIFY(result.has_parse_error);
         QCOMPARE(result.err_line, 1);
         verifyParseErrorTree(result);
+    }
+
+    void test_edgeFixture()
+    {
+        auto result = m_parser.parse(readFixture("ini_edge.ini"));
+        QVERIFY(result.ok);
+
+        const ConfigNode *general = nullptr;
+        const ConfigNode *paths = nullptr;
+        const ConfigNode *dup = nullptr;
+        for(const auto &child : result.root.children) {
+            if(child.key == "General")
+                general = &child;
+            if(child.key == "Paths")
+                paths = &child;
+            if(child.key == "Dup")
+                dup = &child;
+        }
+
+        QVERIFY(general != nullptr);
+        QVERIFY(paths != nullptr);
+        QVERIFY(dup != nullptr);
+
+        const ConfigNode *nameNode = nullptr;
+        for(const auto &child : general->children) {
+            if(child.key == "name") {
+                nameNode = &child;
+                break;
+            }
+        }
+        QVERIFY(nameNode != nullptr);
+        QCOMPARE(nameNode->scalar, std::string("DataTreeViewer"));
+
+        const ConfigNode *cacheNode = nullptr;
+        for(const auto &child : paths->children) {
+            if(child.key == "cache") {
+                cacheNode = &child;
+                break;
+            }
+        }
+        QVERIFY(cacheNode != nullptr);
+        QCOMPARE(cacheNode->comment, std::string("cache dir"));
+        QCOMPARE(dup->children.size(), size_t(2));
     }
 };
 

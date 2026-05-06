@@ -1,0 +1,19 @@
+meta:
+  name: "DataTreeViewer"
+  enabled: true
+  retries: 3
+  ratio: 2.5
+items:
+  - id: 1
+    tags: [alpha, beta]
+  - id: 2
+    tags:
+      - gamma
+      - delta
+quoted_hash: "value # still data"
+literal_block: |
+  line one
+  line two
+folded_block: >
+  folded
+  text

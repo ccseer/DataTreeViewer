@@ -1,3 +1,4 @@
+#include <QFile>
 #include <QTest>
 
 #include <nlohmann/json.hpp>
@@ -13,6 +14,14 @@ private:
     static std::string toBytes(const std::vector<std::uint8_t> &bytes)
     {
         return std::string(reinterpret_cast<const char *>(bytes.data()), bytes.size());
+    }
+
+    std::string readFixture(const char *name)
+    {
+        QString path = QString(FIXTURES_DIR) + "/" + name;
+        QFile f(path);
+        f.open(QIODevice::ReadOnly);
+        return f.readAll().toStdString();
     }
 
     const ConfigNode *findByKey(const ConfigNode &parent, const std::string &key)
@@ -120,6 +129,20 @@ private slots:
         QCOMPARE(result.error, std::string("Invalid CBOR data"));
         QCOMPARE(result.err_line, -1);
         verifyParseErrorTree(result);
+    }
+
+    void test_fixtureFiles()
+    {
+        auto result = m_parser.parse(readFixture("sample.cbor"));
+        QVERIFY(result.ok);
+        QVERIFY(!result.has_parse_error);
+        QCOMPARE(result.root.type, ConfigNode::Type::Object);
+        QCOMPARE(findByKey(result.root, "name")->scalar, std::string("alice"));
+        QCOMPARE(findByKey(result.root, "count")->scalar, std::string("42"));
+
+        auto invalid = m_parser.parse(readFixture("invalid.cbor"));
+        QVERIFY(invalid.ok);
+        QVERIFY(invalid.has_parse_error);
     }
 };
 

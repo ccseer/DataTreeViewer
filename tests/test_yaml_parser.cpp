@@ -46,6 +46,7 @@ private slots:
     {
         QTest::addColumn<QString>("path");
         QTest::newRow("sample") << "sample.yaml";
+        QTest::newRow("edge") << "yaml_edge.yaml";
     }
 
     void test_parseValid()
@@ -293,6 +294,30 @@ private slots:
         QVERIFY(result.has_parse_error);
         QVERIFY(result.err_line > 0);
         verifyParseErrorTree(result);
+    }
+
+    void test_edgeFixture()
+    {
+        auto result = m_parser.parse(readFixture("yaml_edge.yaml"));
+        QVERIFY(result.ok);
+
+        auto findByKey = [](const ConfigNode &parent,
+                            const std::string &key) -> const ConfigNode * {
+            for(const auto &c : parent.children)
+                if(c.key == key)
+                    return &c;
+            return nullptr;
+        };
+
+        const auto *meta = findByKey(result.root, "meta");
+        QVERIFY(meta != nullptr);
+        const auto *items = findByKey(result.root, "items");
+        QVERIFY(items != nullptr);
+        QCOMPARE(items->type, ConfigNode::Type::Array);
+        QCOMPARE(items->children.size(), size_t(2));
+        const auto *quotedHash = findByKey(result.root, "quoted_hash");
+        QVERIFY(quotedHash != nullptr);
+        QCOMPARE(quotedHash->scalar, std::string("value # still data"));
     }
 };
 

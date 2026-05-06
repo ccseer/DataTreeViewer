@@ -60,6 +60,7 @@ private slots:
     {
         QTest::addColumn<QString>("path");
         QTest::newRow("sample") << "sample.toml";
+        QTest::newRow("edge") << "toml_edge.toml";
     }
 
     void test_parseValid()
@@ -200,6 +201,24 @@ private slots:
         QVERIFY(result.has_parse_error);
         QVERIFY(result.err_line > 0);
         verifyParseErrorTree(result);
+    }
+
+    void test_edgeFixture()
+    {
+        auto result = m_parser.parse(readFixture("toml_edge.toml"));
+        QVERIFY(result.ok);
+
+        const auto *products = findByKey(result.root, "products");
+        QVERIFY(products != nullptr);
+        QCOMPARE(products->type, ConfigNode::Type::Array);
+        QCOMPARE(products->children.size(), size_t(2));
+
+        const auto *server = findByKey(result.root, "server");
+        QVERIFY(server != nullptr);
+        const auto *ports = findByKey(*server, "ports");
+        QVERIFY(ports != nullptr);
+        QCOMPARE(ports->type, ConfigNode::Type::Array);
+        QCOMPARE(ports->children.size(), size_t(3));
     }
 };
 
