@@ -66,6 +66,14 @@ FetchContent_Declare(rapidyaml
 )
 FetchContent_MakeAvailable(rapidyaml)
 
+message(STATUS "Fetching third-party dependencies... pugixml")
+FetchContent_Declare(pugixml
+    GIT_REPOSITORY https://github.com/zeux/pugixml.git
+    GIT_TAG        v1.14
+    GIT_SHALLOW    TRUE
+)
+FetchContent_MakeAvailable(pugixml)
+
 # ---- Sources ----
 set(CORE_SOURCES
     src/core/config_node.h
@@ -91,6 +99,8 @@ set(PARSER_SOURCES
     src/parsers/jsonl_parser.cpp
     src/parsers/cbor_parser.h
     src/parsers/cbor_parser.cpp
+    src/parsers/xml_parser.h
+    src/parsers/xml_parser.cpp
 )
 
 set(WORKER_SOURCES
@@ -138,6 +148,7 @@ target_link_libraries(datatreeviewer PRIVATE
     nlohmann_json::nlohmann_json
     tomlplusplus::tomlplusplus
     ryml
+    pugixml::pugixml
     Qt6::Core Qt6::Gui Qt6::Widgets Qt6::Svg
 )
 
@@ -175,6 +186,7 @@ if(BUILD_TESTS)
             nlohmann_json::nlohmann_json
             tomlplusplus::tomlplusplus
             ryml
+            pugixml::pugixml
             Qt6::Test
         )
         target_sources(${NAME} PRIVATE
@@ -194,6 +206,7 @@ if(BUILD_TESTS)
     add_parser_test(test_env_parser   tests/test_env_parser.cpp)
     add_parser_test(test_jsonl_parser tests/test_jsonl_parser.cpp)
     add_parser_test(test_cbor_parser  tests/test_cbor_parser.cpp)
+    add_parser_test(test_xml_parser   tests/test_xml_parser.cpp)
 
     add_custom_target(run_all_tests
         COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure
