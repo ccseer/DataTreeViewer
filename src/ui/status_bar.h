@@ -17,6 +17,7 @@ public:
                      const QString &warning = {});
     void setSourceLine(int line);
     void setValueText(const QString &text);
+    void setValueText(const QString &text, const QString &tooltip);
     void showLoading();
     void showFilterNoHits(const QString &text);
     void restoreInfo();

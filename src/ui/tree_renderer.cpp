@@ -152,6 +152,15 @@ const ConfigNode *TreeRenderer::currentNode() const
     return m_model->nodeFromIndex(src);
 }
 
+NodePath TreeRenderer::currentNodePath() const
+{
+    QModelIndex current = currentIndex();
+    if(!current.isValid())
+        return {};
+    QModelIndex src = m_proxy->mapToSource(current);
+    return nodePathFromIndex(src);
+}
+
 void TreeRenderer::contextMenuEvent(QContextMenuEvent *event)
 {
     QMenu menu(this);
@@ -161,6 +170,13 @@ void TreeRenderer::contextMenuEvent(QContextMenuEvent *event)
         menu.addAction("Copy Key", this, &TreeRenderer::copyKey);
         menu.addAction("Copy Value", this, &TreeRenderer::copyValue);
         menu.addAction("Copy Key: Value", this, &TreeRenderer::copyKeyValuePair);
+
+        NodePath path = currentNodePath();
+        if(!path.dotPath.isEmpty()) {
+            menu.addSeparator();
+            menu.addAction("Copy Path", this, &TreeRenderer::copyDotPath);
+            menu.addAction("Copy JSON Pointer", this, &TreeRenderer::copyJsonPointer);
+        }
         menu.addSeparator();
     }
 
@@ -212,4 +228,18 @@ void TreeRenderer::copyKeyValuePair()
         QString val = idx.sibling(idx.row(), 1).data(Qt::DisplayRole).toString();
         QApplication::clipboard()->setText(QString("%1: %2").arg(key, val));
     }
+}
+
+void TreeRenderer::copyDotPath()
+{
+    NodePath path = currentNodePath();
+    if(!path.dotPath.isEmpty())
+        QApplication::clipboard()->setText(path.dotPath);
+}
+
+void TreeRenderer::copyJsonPointer()
+{
+    NodePath path = currentNodePath();
+    if(!path.jsonPointer.isEmpty())
+        QApplication::clipboard()->setText(path.jsonPointer);
 }

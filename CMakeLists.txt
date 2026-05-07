@@ -115,6 +115,8 @@ set(UI_SOURCES
     src/ui/status_bar.h
     src/ui/status_bar.cpp
     src/ui/style_assets.h
+    src/ui/node_path.h
+    src/ui/node_path.cpp
     src/ui/tree_delegate.h
     src/ui/tree_delegate.cpp
     src/ui/tree_filter_proxy.h
@@ -206,6 +208,14 @@ if(BUILD_TESTS)
     add_parser_test(test_cbor_parser  tests/test_cbor_parser.cpp)
     add_parser_test(test_xml_parser   tests/test_xml_parser.cpp)
     add_parser_test(test_plist_parser tests/test_plist_parser.cpp)
+
+    add_executable(test_node_path tests/test_node_path.cpp)
+    target_include_directories(test_node_path PRIVATE src/ ${simpleini_SOURCE_DIR})
+    target_link_libraries(test_node_path PRIVATE
+        datatreeviewer Qt6::Gui Qt6::Widgets Qt6::Test
+    )
+    add_test(NAME test_node_path COMMAND test_node_path)
+    list(APPEND PARSER_TEST_TARGETS test_node_path)
 
     add_custom_target(run_all_tests
         COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure

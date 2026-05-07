@@ -102,6 +102,11 @@ void StatusBar::setSourceLine(int line)
 
 void StatusBar::setValueText(const QString &text)
 {
+    setValueText(text, text);
+}
+
+void StatusBar::setValueText(const QString &text, const QString &tooltip)
+{
     if(text.isEmpty()) {
         m_valueLabel->clear();
         m_valueLabel->setToolTip({});
@@ -109,7 +114,7 @@ void StatusBar::setValueText(const QString &text)
     }
 
     m_valueLabel->setText(text);
-    m_valueLabel->setToolTip(text);
+    m_valueLabel->setToolTip(tooltip);
 }
 
 void StatusBar::showLoading()

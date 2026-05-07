@@ -3,6 +3,7 @@
 #include <QTreeView>
 
 struct ConfigNode;
+#include "node_path.h"
 
 class TreeModel;
 class TreeFilterProxyModel;
@@ -28,6 +29,7 @@ public:
     }
 
     const ConfigNode *currentNode() const;
+    NodePath currentNodePath() const;
 
 signals:
     void nodeActivated(const ConfigNode *node);
@@ -41,6 +43,8 @@ private slots:
     void copyKey();
     void copyValue();
     void copyKeyValuePair();
+    void copyDotPath();
+    void copyJsonPointer();
 
 private:
     TreeModel *m_model = nullptr;

@@ -15,6 +15,7 @@
 #include "search_bar.h"
 #include "status_bar.h"
 #include "style_assets.h"
+#include "node_path.h"
 #include "tree_renderer.h"
 #include "workers/background_thread.h"
 #include "workers/parse_worker.h"
@@ -232,8 +233,20 @@ void DataTreeViewer::onParseCompleted(std::shared_ptr<const ParseResult> result,
 
 void DataTreeViewer::onNodeActivated(const ConfigNode *node)
 {
-    if(node) {
-        m_status->setValueText(statusValueForNode(*node));
+    QModelIndex current = m_renderer->currentIndex();
+    NodePath nodePath = m_renderer->currentNodePath();
+
+    if(node && (!m_lastResult || !m_lastResult->has_parse_error)) {
+        const QString value = statusValueForNode(*node);
+        if(nodePath.dotPath.isEmpty()) {
+            m_status->setValueText(value);
+        } else {
+            const QString text = QString("%1  |  %2").arg(nodePath.dotPath, value);
+            const QString tooltip =
+                QString("Path: %1\nJSON Pointer: %2\nValue: %3")
+                    .arg(nodePath.dotPath, nodePath.jsonPointer, value);
+            m_status->setValueText(text, tooltip);
+        }
     } else {
         m_status->setValueText({});
     }
@@ -243,7 +256,6 @@ void DataTreeViewer::onNodeActivated(const ConfigNode *node)
     else
         m_status->setSourceLine(-1);
 
-    QModelIndex current = m_renderer->currentIndex();
     if(!current.isValid()) {
         m_breadcrumb->clear();
         return;
