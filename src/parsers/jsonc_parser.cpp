@@ -38,10 +38,15 @@ struct CommentEntry {
     std::string comment;
 };
 
-void trim(std::string &s) {
-    auto it1 = std::find_if(s.begin(), s.end(), [](unsigned char ch) { return !std::isspace(ch); });
+void trim(std::string &s)
+{
+    auto it1 = std::find_if(s.begin(), s.end(), [](unsigned char ch) {
+        return !std::isspace(ch);
+    });
     s.erase(s.begin(), it1);
-    auto it2 = std::find_if(s.rbegin(), s.rend(), [](unsigned char ch) { return !std::isspace(ch); });
+    auto it2 = std::find_if(s.rbegin(), s.rend(), [](unsigned char ch) {
+        return !std::isspace(ch);
+    });
     s.erase(it2.base(), s.end());
 }
 
@@ -199,6 +204,15 @@ std::queue<CommentEntry> collectComments(std::string_view data)
                         comments.push({std::move(key), pendingComment});
                         pendingComment.clear();
                     }
+                } else {
+                    size_t inlineComment = findCommentStart(line);
+                    std::string text = commentTextFrom(line, inlineComment);
+                    if(!text.empty()) {
+                        comments.push({"", std::move(text)});
+                    } else if(!pendingComment.empty()) {
+                        comments.push({"", pendingComment});
+                        pendingComment.clear();
+                    }
                 }
             }
         }
@@ -264,24 +278,26 @@ std::string stripComments(const std::string_view &data)
     bool in_block = false;
     bool in_line = false;
 
-    for (size_t i = 0; i < data.size(); ++i) {
+    for(size_t i = 0; i < data.size(); ++i) {
         char c = data[i];
-        char next = (i + 1 < data.size()) ? data[i+1] : 0;
+        char next = (i + 1 < data.size()) ? data[i + 1] : 0;
 
-        if (in_block) {
-            if (c == '*' && next == '/') {
+        if(in_block) {
+            if(c == '*' && next == '/') {
                 in_block = false;
                 i++;
                 clean.append("  ");
             } else {
-                if (c == '\n') clean.push_back('\n');
-                else clean.push_back(' ');
+                if(c == '\n')
+                    clean.push_back('\n');
+                else
+                    clean.push_back(' ');
             }
             continue;
         }
 
-        if (in_line) {
-            if (c == '\n') {
+        if(in_line) {
+            if(c == '\n') {
                 in_line = false;
                 clean.push_back('\n');
             } else {
@@ -290,41 +306,42 @@ std::string stripComments(const std::string_view &data)
             continue;
         }
 
-        if (in_str) {
-            if (c == '"') {
+        if(in_str) {
+            if(c == '"') {
                 bool escaped = false;
                 size_t k = i;
-                while (k > 0 && data[k-1] == '\\') {
+                while(k > 0 && data[k - 1] == '\\') {
                     escaped = !escaped;
                     k--;
                 }
-                if (!escaped) in_str = false;
+                if(!escaped)
+                    in_str = false;
             }
             clean.push_back(c);
             continue;
         }
 
-        if (c == '"') {
+        if(c == '"') {
             in_str = true;
             clean.push_back(c);
             continue;
         }
 
-        if (c == '/' && next == '/') {
+        if(c == '/' && next == '/') {
             in_line = true;
             i++;
             clean.append("  ");
             continue;
         }
 
-        if (c == '/' && next == '*') {
+        if(c == '/' && next == '*') {
             in_block = true;
             i++;
             clean.append("  ");
             continue;
         }
 
-        if (c == '#') {
+        if(c == '#') {
             in_line = true;
             clean.push_back(' ');
             continue;
@@ -338,10 +355,12 @@ std::string stripComments(const std::string_view &data)
 
 void annotateComments(ConfigNode &node, std::queue<CommentEntry> &comments)
 {
-    if (comments.empty()) return;
+    if(comments.empty())
+        return;
     for(auto &child : node.children) {
-        if(!child.key.empty() && !comments.empty()) {
-            if(comments.front().key == child.key) {
+        if(!comments.empty()) {
+            if((!child.key.empty() && comments.front().key == child.key) ||
+               (child.key.empty() && comments.front().key.empty())) {
                 child.comment = comments.front().comment;
                 comments.pop();
             }
@@ -365,7 +384,7 @@ ParseResult JsoncParser::parse(std::string_view data)
         traceJsonc("comments stripped, clean bytes=" + std::to_string(clean.size()) +
                    ", pending comments=" + std::to_string(comments.size()));
 
-        auto j = nlohmann::json::parse(clean, nullptr, false, true);
+        auto j = nlohmann::ordered_json::parse(clean, nullptr, false, true);
         if(j.is_discarded()) {
             result.err_line = estimateErrorLine(clean);
             result.root = dtv::core::createErrorNode("Invalid JSONC syntax", result.err_line);
@@ -410,8 +429,12 @@ std::string JsoncParser::library_credit() const
 void JsoncParser::registerSelf()
 {
     auto &reg = ParserRegistry::instance();
-    reg.registerParser("json", [] { return std::make_unique<JsoncParser>(); });
-    reg.registerParser("jsonc", [] { return std::make_unique<JsoncParser>(); });
+    reg.registerParser("json", [] {
+        return std::make_unique<JsoncParser>();
+    });
+    reg.registerParser("jsonc", [] {
+        return std::make_unique<JsoncParser>();
+    });
 }
 
 REGISTER_PARSER("json", JsoncParser)

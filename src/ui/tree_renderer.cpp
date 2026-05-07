@@ -45,6 +45,12 @@ TreeRenderer::TreeRenderer(QWidget *parent) : QTreeView(parent)
                 if(node)
                     emit nodeActivated(node);
             });
+
+    // Ctrl+C shortcut for Copy Key: Value
+    auto *copyAction = new QAction(this);
+    copyAction->setShortcut(QKeySequence::Copy);
+    connect(copyAction, &QAction::triggered, this, &TreeRenderer::copyKeyValuePair);
+    addAction(copyAction);
 }
 
 void TreeRenderer::showEvent(QShowEvent *event)
@@ -181,11 +187,15 @@ void TreeRenderer::contextMenuEvent(QContextMenuEvent *event)
     }
 
     QMenu *sortMenu = menu.addMenu("Sort");
-    QAction *origAction = sortMenu->addAction("Original Order", this, [this] { m_proxy->sort(-1); });
-    QAction *ascAction =
-        sortMenu->addAction("A-Z (Ascending)", this, [this] { m_proxy->sort(0, Qt::AscendingOrder); });
-    QAction *descAction =
-        sortMenu->addAction("Z-A (Descending)", this, [this] { m_proxy->sort(0, Qt::DescendingOrder); });
+    QAction *origAction = sortMenu->addAction("Original Order", this, [this] {
+        m_proxy->sort(-1);
+    });
+    QAction *ascAction = sortMenu->addAction("A-Z (Ascending)", this, [this] {
+        m_proxy->sort(0, Qt::AscendingOrder);
+    });
+    QAction *descAction = sortMenu->addAction("Z-A (Descending)", this, [this] {
+        m_proxy->sort(0, Qt::DescendingOrder);
+    });
 
     // Mark current sort state
     if(m_proxy->sortColumn() == -1)

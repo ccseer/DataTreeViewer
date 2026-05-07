@@ -134,6 +134,10 @@ private slots:
         QVERIFY(title != nullptr);
         QCOMPARE(title->comment, std::string("TOML 1.0 sample for DataTreeViewer testing"));
 
+        const auto *owner = findByKey(result.root, "owner");
+        QVERIFY(owner != nullptr);
+        QVERIFY(owner->comment.empty());
+
         const auto *emptySection = findByKey(result.root, "empty_section");
         QVERIFY(emptySection != nullptr);
         QCOMPARE(emptySection->comment, std::string("Standalone section tests"));
@@ -141,9 +145,8 @@ private slots:
 
     void test_inlineComment()
     {
-        auto result = m_parser.parse(
-            "title = \"TOML\" # inline title\n"
-            "hash = \"value # not comment\"\n");
+        auto result = m_parser.parse("title = \"TOML\" # inline title\n"
+                                     "hash = \"value # not comment\"\n");
         QVERIFY(result.ok);
 
         const auto *title = findByKey(result.root, "title");

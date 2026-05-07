@@ -259,6 +259,11 @@ private slots:
         QVERIFY(arrayNode != nullptr);
         QCOMPARE(arrayNode->type, ConfigNode::Type::Array);
         QCOMPARE(arrayNode->children.size(), size_t(2));
+        QCOMPARE(QString::fromStdString(arrayNode->children[0].comment), QString("inline one"));
+        QVERIFY(!arrayNode->children[1].children.empty());
+        QCOMPARE(arrayNode->children[1].children[0].key, std::string("flag"));
+        QCOMPARE(QString::fromStdString(arrayNode->children[1].children[0].comment),
+                 QString("nested block"));
 
         const auto *urlNode = [&]() -> const ConfigNode * {
             for(const auto &child : result.root.children)

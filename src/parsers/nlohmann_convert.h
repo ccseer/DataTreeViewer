@@ -22,7 +22,7 @@ inline std::string binaryToHex(const nlohmann::json::binary_t &bytes)
     return out;
 }
 
-inline ConfigNode convertNlohmann(const nlohmann::json &j)
+template <typename Json> inline ConfigNode convertNlohmann(const Json &j)
 {
     ConfigNode node;
     switch(j.type()) {

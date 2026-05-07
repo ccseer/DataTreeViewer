@@ -60,33 +60,32 @@ private slots:
 
     void test_wsjcppManifest()
     {
-        auto result = m_parser.parse(
-            "wsjcpp_version: \"v0.1.1\"\n"
-            "cmake_minimum_required: \"3.0\"\n"
-            "cmake_cxx_standard: \"11\"\n"
-            "name: \"nlohmann/json\"\n"
-            "version: \"v3.11.3\"\n"
-            "description: \"JSON for Modern C++\"\n"
-            "issues: \"https://github.com/nlohmann/json/issues\"\n"
-            "keywords:\n"
-            "  - \"c++\"\n"
-            "  - \"json\"\n"
-            "\n"
-            "repositories:\n"
-            "  - type: main\n"
-            "    url: \"https://github.com/nlohmann/json\"\n"
-            "\n"
-            "authors:\n"
-            "  - name: \"Niels Lohmann\"\n"
-            "    email: \"mail@nlohmann.me\"\n"
-            "\n"
-            "distribution:\n"
-            "  - source-file: \"single_include/nlohmann/json.hpp\"\n"
-            "    target-file: \"json.hpp\"\n"
-            "    type: \"source-code\"\n"
-            "  - source-file: \"single_include/nlohmann/json_fwd.hpp\"\n"
-            "    target-file: \"json_fwd.hpp\"\n"
-            "    type: \"source-code\"\n");
+        auto result = m_parser.parse("wsjcpp_version: \"v0.1.1\"\n"
+                                     "cmake_minimum_required: \"3.0\"\n"
+                                     "cmake_cxx_standard: \"11\"\n"
+                                     "name: \"nlohmann/json\"\n"
+                                     "version: \"v3.11.3\"\n"
+                                     "description: \"JSON for Modern C++\"\n"
+                                     "issues: \"https://github.com/nlohmann/json/issues\"\n"
+                                     "keywords:\n"
+                                     "  - \"c++\"\n"
+                                     "  - \"json\"\n"
+                                     "\n"
+                                     "repositories:\n"
+                                     "  - type: main\n"
+                                     "    url: \"https://github.com/nlohmann/json\"\n"
+                                     "\n"
+                                     "authors:\n"
+                                     "  - name: \"Niels Lohmann\"\n"
+                                     "    email: \"mail@nlohmann.me\"\n"
+                                     "\n"
+                                     "distribution:\n"
+                                     "  - source-file: \"single_include/nlohmann/json.hpp\"\n"
+                                     "    target-file: \"json.hpp\"\n"
+                                     "    type: \"source-code\"\n"
+                                     "  - source-file: \"single_include/nlohmann/json_fwd.hpp\"\n"
+                                     "    target-file: \"json_fwd.hpp\"\n"
+                                     "    type: \"source-code\"\n");
         QVERIFY2(result.ok, result.error.c_str());
         QVERIFY(!result.has_parse_error);
         QCOMPARE(result.root.type, ConfigNode::Type::Object);
@@ -186,12 +185,11 @@ private slots:
 
     void test_commentExtraction()
     {
-        auto result = m_parser.parse(
-            "# leading a\n"
-            "a: 1\n"
-            "b: 2 # inline b\n"
-            "# leading c\n"
-            "c: 3\n");
+        auto result = m_parser.parse("# leading a\n"
+                                     "a: 1\n"
+                                     "b: 2 # inline b\n"
+                                     "# leading c\n"
+                                     "c: 3\n");
         QVERIFY2(result.ok, result.error.c_str());
 
         auto findByKey = [](const ConfigNode &parent,
@@ -216,6 +214,9 @@ private slots:
 
         auto fixture = m_parser.parse(readFixture("sample.yaml"));
         QVERIFY2(fixture.ok, fixture.error.c_str());
+        const auto *versionNode = findByKey(fixture.root, "version");
+        QVERIFY(versionNode != nullptr);
+        QVERIFY(versionNode->comment.empty());
         const auto *commentedNode = findByKey(fixture.root, "commented_key");
         QVERIFY(commentedNode != nullptr);
         QCOMPARE(QString::fromStdString(commentedNode->comment), QString("inline value comment"));
@@ -223,10 +224,9 @@ private slots:
 
     void test_hashInsideQuotedScalarIsNotComment()
     {
-        auto result = m_parser.parse(
-            "single: 'value # not comment'\n"
-            "double: \"value # not comment\"\n"
-            "plain: value # real comment\n");
+        auto result = m_parser.parse("single: 'value # not comment'\n"
+                                     "double: \"value # not comment\"\n"
+                                     "plain: value # real comment\n");
         QVERIFY2(result.ok, result.error.c_str());
 
         auto findByKey = [](const ConfigNode &parent,
@@ -254,12 +254,11 @@ private slots:
 
     void test_quotedScalarsStayStrings()
     {
-        auto result = m_parser.parse(
-            "quoted_int: \"42\"\n"
-            "quoted_bool: 'true'\n"
-            "plain_int: 42\n"
-            "literal_bool: |\n"
-            "  true\n");
+        auto result = m_parser.parse("quoted_int: \"42\"\n"
+                                     "quoted_bool: 'true'\n"
+                                     "plain_int: 42\n"
+                                     "literal_bool: |\n"
+                                     "  true\n");
         QVERIFY2(result.ok, result.error.c_str());
 
         auto findByKey = [](const ConfigNode &parent,
