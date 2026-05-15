@@ -32,6 +32,3 @@ To run parser tests:
 3. Replace the installed plugin DLL with your freshly built `datatreeviewer.dll`
 4. Press Space on any `.jsonc`, `.toml`, `.ini`, or `.yaml` file
 
-## License
-
-MIT © 2026 ccseer
